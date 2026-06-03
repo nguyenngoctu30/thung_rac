@@ -292,6 +292,25 @@
     box-shadow: 0 2px 8px rgba(37,99,235,0.15);
   }
 
+  .buzzer-off-btn {
+    margin-top: 14px;
+    border: 1px solid rgba(220,38,38,0.25);
+    background: rgba(220,38,38,0.08);
+    color: var(--accent-red);
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .buzzer-off-btn:hover {
+    background: rgba(220,38,38,0.14);
+    transform: translateY(-1px);
+  }
+
   /* ── BINS GRID ── */
   .bins-section h2 {
     font-family: 'Rajdhani', sans-serif;
@@ -819,6 +838,7 @@
           <div class="servo-tag" id="servo1Tag">⚙️ SERVO 1: CHỜ</div>
           <div class="servo-tag" id="servo2Tag">⚙️ SERVO 2: CHỜ</div>
         </div>
+        <button class="buzzer-off-btn" onclick="sendBuzzerOff()">Tắt buzzer</button>
       </div>
       <div class="detection-time" id="detectionTime">--:--:--</div>
     </div>
@@ -1050,6 +1070,16 @@ function setDetection(type) {
   document.getElementById('statDetect').textContent = stats.detect;
   document.getElementById('statInorganic').textContent = stats.inorganic;
   document.getElementById('statOrganic').textContent = stats.organic;
+}
+
+function sendBuzzerOff() {
+  if (!mqttClient || !mqttClient.connected) {
+    addLog('Không thể gửi tắt buzzer — MQTT chưa kết nối', 'red');
+    return;
+  }
+
+  mqttClient.publish('esp32/buzzer/control', 'off');
+  addLog('Đã gửi lệnh tắt buzzer', 'orange');
 }
 
 // ── BIN STATUS UPDATE ─────────────────────────────────────────
