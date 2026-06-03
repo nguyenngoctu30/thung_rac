@@ -9,24 +9,24 @@ const char* password = "10101010";
 
 const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
-const char* topic_sub = "esp32/servo/control";
+const char* topic_sub     = "esp32/servo/control";
 const char* topic_sensor1 = "esp32/ultrasonic/sensor1";
 const char* topic_sensor2 = "esp32/ultrasonic/sensor2";
 const char* topic_status1 = "esp32/ultrasonic/status1";
 const char* topic_status2 = "esp32/ultrasonic/status2";
+const char* topic_buzzer  = "esp32/buzzer/control";   
 
 const float DISTANCE_THRESHOLD = 15.0f;
 
 const int BUZZER_PIN = 26;
 
-
 const unsigned long BEEP_ON  = 200;
 const unsigned long BEEP_OFF = 200;
 
-bool buzzerActive   = false;   
-bool buzzerState    = false;   
+bool buzzerActive       = false;
+bool buzzerState        = false;
 unsigned long buzzerLast = 0;
-// ──────────────────────────────────────────────────────────────
+bool buzzerMuted        = false;   
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -121,15 +121,18 @@ void publishSensors() {
   }
 
   if (full1 || full2) {
-    if (!buzzerActive) {
+    // NEW: chỉ bật còi nếu chưa bị mute và còi chưa đang kêu
+    if (!buzzerMuted && !buzzerActive) {
       buzzerActive = true;
       buzzerState  = true;
       buzzerLast   = millis();
       digitalWrite(BUZZER_PIN, HIGH);
     }
   } else {
+    // Thùng đã được dọn → reset mute để lần đầy tiếp theo còi kêu lại bình thường
     buzzerActive = false;
     buzzerState  = false;
+    buzzerMuted  = false;   // NEW
     digitalWrite(BUZZER_PIN, LOW);
   }
 }
@@ -148,6 +151,7 @@ void reconnect() {
 
     if (client.connect(clientId.c_str())) {
       client.subscribe(topic_sub);
+      client.subscribe(topic_buzzer);   // NEW: subscribe topic tắt còi
     } else {
       delay(2000);
     }
@@ -160,18 +164,32 @@ void callback(char* topic, byte* payload, unsigned int length) {
     msg += (char)payload[i];
   }
 
-  if (msg == "1" && !servo1Busy) {
-    servo1.write(90);
-    servo1Start = millis();
-    servo1Busy = true;
-    lastSensorRead = millis();
+  // ── Điều khiển servo ──────────────────────────────────────
+  if (strcmp(topic, topic_sub) == 0) {
+    if (msg == "1" && !servo1Busy) {
+      servo1.write(90);
+      servo1Start = millis();
+      servo1Busy = true;
+      lastSensorRead = millis();
+    }
+    if (msg == "0" && !servo2Busy) {
+      servo2.write(90);
+      servo2Start = millis();
+      servo2Busy = true;
+      lastSensorRead = millis();
+    }
   }
 
-  if (msg == "0" && !servo2Busy) {
-    servo2.write(90);
-    servo2Start = millis();
-    servo2Busy = true;
-    lastSensorRead = millis();
+  // ── Tắt còi (NEW) ────────────────────────────────────────
+  // Gửi "off" đến esp32/buzzer/control để tắt còi đang kêu.
+  // Còi sẽ tự kêu lại khi thùng được dọn rồi đầy trở lại.
+  if (strcmp(topic, topic_buzzer) == 0) {
+    if (msg == "off" && buzzerActive) {
+      buzzerActive = false;
+      buzzerState  = false;
+      buzzerMuted  = true;          // đánh dấu đã mute thủ công
+      digitalWrite(BUZZER_PIN, LOW);
+    }
   }
 }
 
