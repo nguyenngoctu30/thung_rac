@@ -3,1246 +3,1588 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hệ Thống Thùng Rác Thông Minh</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>Smart Bin · IUH IoT</title>
+<meta name="description" content="Hệ thống giám sát thùng rác thông minh IoT – ESP32 + MQTT realtime tại IUH">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #f0f2f5;
-    --bg2: #e8eaed;
-    --panel: #ffffff;
-    --panel2: #f5f6f8;
-    --accent-green: #1a9e6e;
-    --accent-blue: #2563eb;
-    --accent-orange: #d97706;
-    --accent-red: #dc2626;
-    --accent-yellow: #ca8a04;
-    --text: #1a1f2e;
-    --text-dim: #6b7280;
-    --border: rgba(0,0,0,0.09);
-    --border-glow: rgba(26,158,110,0.2);
-    --glow-green: 0 2px 12px rgba(26,158,110,0.15);
-    --glow-red: 0 2px 16px rgba(220,38,38,0.18);
-    --glow-blue: 0 2px 12px rgba(37,99,235,0.15);
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Exo 2', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Subtle dot grid background */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(0,0,0,0.07) 1px, transparent 1px);
-    background-size: 28px 28px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Soft top gradient */
-  body::after {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 280px;
-    background: linear-gradient(to bottom, rgba(37,99,235,0.04), transparent);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .wrapper { position: relative; z-index: 1; }
-
-  /* ── HEADER ── */
-  header {
-    background: linear-gradient(135deg, rgba(255,255,255,0.97), rgba(245,246,248,0.97));
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    backdrop-filter: blur(12px);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .header-logos {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .logo-img {
-    height: 52px;
-    width: auto;
-    object-fit: contain;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.1));
-    transition: filter 0.3s;
-  }
-  .logo-img:hover { filter: drop-shadow(0 4px 12px rgba(37,99,235,0.2)); }
-
-  .logo-divider {
-    width: 1px;
-    height: 40px;
-    background: linear-gradient(to bottom, transparent, #9ca3af, transparent);
-  }
-
-  .header-title {
-    flex: 1;
-    text-align: center;
-  }
-
-  .header-title h1 {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: clamp(15px, 2.5vw, 22px);
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: 1px;
-    line-height: 1.2;
-  }
-
-  .header-title p {
-    font-size: clamp(10px, 1.5vw, 12px);
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 2px;
-  }
-
-  .connection-badge {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    transition: all 0.3s;
-  }
-
-  .connection-badge.connected {
-    border-color: var(--accent-green);
-    color: var(--accent-green);
-    box-shadow: var(--glow-green);
-  }
-
-  .connection-badge.disconnected {
-    border-color: var(--accent-red);
-    color: var(--accent-red);
-    box-shadow: var(--glow-red);
-  }
-
-  .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-
-  .dot.pulse {
-    animation: pulse-dot 1.2s ease-in-out infinite;
-  }
-
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.7); }
-  }
-
-  /* ── MAIN ── */
-  main {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 28px 20px 48px;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  /* ── DETECTION BANNER ── */
-  .detection-banner {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 20px 28px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    transition: all 0.4s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .detection-banner::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, transparent 60%, rgba(37,99,235,0.03));
-    pointer-events: none;
-  }
-
-  .detection-banner.organic-active {
-    border-color: rgba(26,158,110,0.4);
-    box-shadow: var(--glow-green);
-  }
-
-  .detection-banner.inorganic-active {
-    border-color: rgba(217,119,6,0.35);
-    box-shadow: 0 2px 16px rgba(217,119,6,0.15);
-  }
-
-  .detection-icon {
-    width: 64px; height: 64px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 30px;
-    flex-shrink: 0;
-    border: 1px solid var(--border);
-    background: var(--panel2);
-    transition: all 0.3s;
-  }
-
-  .detection-icon.active-organic {
-    background: rgba(26,158,110,0.08);
-    border-color: var(--accent-green);
-    box-shadow: var(--glow-green);
-    animation: icon-pop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
-  }
-
-  .detection-icon.active-inorganic {
-    background: rgba(217,119,6,0.08);
-    border-color: var(--accent-orange);
-    box-shadow: 0 2px 12px rgba(217,119,6,0.2);
-    animation: icon-pop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
-  }
-
-  @keyframes icon-pop {
-    0% { transform: scale(0.8); }
-    60% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-  }
-
-  .detection-info { flex: 1; }
-
-  .detection-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 4px;
-  }
-
-  .detection-type {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: clamp(20px, 3vw, 28px);
-    font-weight: 700;
-    letter-spacing: 1px;
-    transition: color 0.3s;
-  }
-
-  .detection-type.organic { color: var(--accent-green); }
-  .detection-type.inorganic { color: var(--accent-orange); }
-  .detection-type.idle { color: var(--text-dim); }
-
-  .detection-sub {
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-top: 2px;
-  }
-
-  .detection-time {
-    font-size: 12px;
-    color: var(--text-dim);
-    font-family: 'Rajdhani', sans-serif;
-    letter-spacing: 0.5px;
-  }
-
-  /* Servo signal tag */
-  .servo-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-top: 8px;
-  }
-
-  .servo-tag.active-tag {
-    border-color: var(--accent-blue);
-    color: var(--accent-blue);
-    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-  }
-
-  .buzzer-off-btn {
-    margin-top: 14px;
-    border: 1px solid rgba(220,38,38,0.25);
-    background: rgba(220,38,38,0.08);
-    color: var(--accent-red);
-    border-radius: 12px;
-    padding: 10px 16px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .buzzer-off-btn:hover {
-    background: rgba(220,38,38,0.14);
-    transform: translateY(-1px);
-  }
-
-  /* ── BINS GRID ── */
-  .bins-section h2 {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 13px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .bins-section h2::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(to right, var(--border), transparent);
-  }
-
-  .bins-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-  }
-
-  /* ── BIN CARD ── */
-  .bin-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 24px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.4s;
-  }
-
-  .bin-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    border-radius: 20px 20px 0 0;
-    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
-    opacity: 0.6;
-    transition: opacity 0.3s;
-  }
-
-  .bin-card.bin-full::before {
-    background: linear-gradient(90deg, var(--accent-red), var(--accent-orange));
-    opacity: 1;
-    animation: top-bar-glow 1.5s ease-in-out infinite alternate;
-  }
-
-  @keyframes top-bar-glow {
-    from { opacity: 0.8; }
-    to { opacity: 1; }
-  }
-
-  .bin-card.bin-full {
-    border-color: rgba(220,38,38,0.3);
-    box-shadow: var(--glow-red);
-  }
-
-  /* Card header row */
-  .bin-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-
-  .bin-title-group { display: flex; align-items: center; gap: 12px; }
-
-  .bin-icon {
-    width: 48px; height: 48px;
-    border-radius: 14px;
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-  }
-
-  .bin-card.bin-full .bin-icon {
-    background: rgba(220,38,38,0.07);
-    border-color: var(--accent-red);
-  }
-
-  .bin-name {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-  }
-
-  .bin-id {
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-  }
-
-  /* Status pill */
-  .bin-status-pill {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    transition: all 0.3s;
-    border: 1px solid;
-  }
-
-  .bin-status-pill.status-ok {
-    background: rgba(26,158,110,0.07);
-    border-color: rgba(26,158,110,0.3);
-    color: var(--accent-green);
-  }
-
-  .bin-status-pill.status-full {
-    background: rgba(220,38,38,0.07);
-    border-color: rgba(220,38,38,0.35);
-    color: var(--accent-red);
-    animation: pill-flash 1s ease-in-out infinite alternate;
-  }
-
-  @keyframes pill-flash {
-    from { box-shadow: none; }
-    to { box-shadow: 0 2px 10px rgba(220,38,38,0.2); }
-  }
-
-  .status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: currentColor;
-    animation: pulse-dot 1.4s ease-in-out infinite;
-  }
-
-  /* Fill visual */
-  .bin-fill-visual {
-    margin: 16px 0;
-    position: relative;
-  }
-
-  .fill-bar-bg {
-    height: 10px;
-    border-radius: 8px;
-    background: #e5e7eb;
-    border: 1px solid rgba(0,0,0,0.06);
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-
-  .fill-bar-inner {
-    height: 100%;
-    border-radius: 8px;
-    transition: width 0.8s cubic-bezier(0.4,0,0.2,1), background 0.4s;
-    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
-  }
-
-  .fill-bar-inner.full-bar {
-    background: linear-gradient(90deg, var(--accent-red), var(--accent-orange));
-    animation: bar-pulse 1.2s ease-in-out infinite alternate;
-  }
-
-  @keyframes bar-pulse {
-    from { opacity: 0.85; }
-    to { opacity: 1; }
-  }
-
-  .fill-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-
-  .fill-percent {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    transition: color 0.3s;
-    letter-spacing: -0.5px;
-  }
-
-  .fill-percent.full-pct { color: var(--accent-red); }
-
-  /* Distance row */
-  .distance-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--panel2);
-    border-radius: 10px;
-    padding: 10px 14px;
-    border: 1px solid var(--border);
-    margin-top: 14px;
-  }
-
-  .dist-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-  }
-
-  .dist-value {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--accent-blue);
-  }
-
-  /* ALERT STRIP */
-  .alert-strip {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    background: rgba(220,38,38,0.05);
-    border: 1px solid rgba(220,38,38,0.25);
-    border-radius: 10px;
-    padding: 10px 16px;
-    margin-top: 14px;
-    font-size: 13px;
-    color: var(--accent-red);
-    font-weight: 600;
-  }
-
-  .alert-strip.visible { display: flex; animation: slide-in 0.3s ease; }
-
-  @keyframes slide-in {
-    from { opacity: 0; transform: translateY(-6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .alert-icon { font-size: 18px; animation: shake 0.5s infinite; }
-
-  @keyframes shake {
-    0%,100% { transform: rotate(0); }
-    25% { transform: rotate(-8deg); }
-    75% { transform: rotate(8deg); }
-  }
-
-  /* ── FULL ALERT PANEL ── */
-  .global-alert {
-    background: rgba(220,38,38,0.04);
-    border: 1px solid rgba(220,38,38,0.3);
-    border-radius: 16px;
-    padding: 18px 24px;
-    display: none;
-    align-items: center;
-    gap: 16px;
-    animation: slide-in 0.4s ease;
-    box-shadow: var(--glow-red);
-  }
-
-  .global-alert.visible { display: flex; }
-
-  .alert-big-icon {
-    font-size: 36px;
-    animation: bounce-alert 0.6s infinite alternate;
-  }
-
-  @keyframes bounce-alert {
-    from { transform: translateY(0) scale(1); }
-    to { transform: translateY(-4px) scale(1.1); }
-  }
-
-  .alert-big-text { flex: 1; }
-  .alert-big-text h3 {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--accent-red);
-    letter-spacing: 1px;
-  }
-
-  .alert-big-text p { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
-
-  .alert-bins-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-  }
-
-  .alert-bin-chip {
-    background: rgba(220,38,38,0.08);
-    border: 1px solid rgba(220,38,38,0.3);
-    border-radius: 8px;
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--accent-red);
-  }
-
-  /* ── LOG ── */
-  .log-section { }
-
-  .log-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .log-header h2 {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 13px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .log-clear {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 5px 12px;
-    color: var(--text-dim);
-    font-size: 11px;
-    cursor: pointer;
-    font-family: 'Exo 2', sans-serif;
-    transition: all 0.2s;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-
-  .log-clear:hover {
-    border-color: var(--accent-blue);
-    color: var(--accent-blue);
-  }
-
-  .log-box {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    height: 200px;
-    overflow-y: auto;
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 13px;
-  }
-
-  .log-box::-webkit-scrollbar { width: 4px; }
-  .log-box::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 2px; }
-  .log-box::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
-
-  .log-entry {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    animation: log-pop 0.2s ease;
-  }
-
-  @keyframes log-pop {
-    from { opacity: 0; transform: translateX(-8px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  .log-time { color: var(--text-dim); flex-shrink: 0; font-size: 12px; }
-  .log-msg { flex: 1; }
-  .log-msg.green { color: var(--accent-green); }
-  .log-msg.orange { color: var(--accent-orange); }
-  .log-msg.red { color: var(--accent-red); }
-  .log-msg.blue { color: var(--accent-blue); }
-  .log-msg.dim { color: var(--text-dim); }
-
-  /* ── STATS ROW ── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 14px;
-  }
-
-  .stat-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px 18px;
-    transition: all 0.3s;
-  }
-
-  .stat-card:hover {
-    border-color: rgba(0,170,255,0.3);
-    transform: translateY(-2px);
-  }
-
-  .stat-label {
-    font-size: 10px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 8px;
-  }
-
-  .stat-value {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1;
-  }
-
-  .stat-value span {
-    font-size: 12px;
-    color: var(--text-dim);
-    font-weight: 400;
-  }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 640px) {
-    header { padding: 12px 16px; gap: 10px; }
-    .header-title h1 { font-size: 13px; }
-    .header-title p { display: none; }
-    .logo-img { height: 40px; }
-    main { padding: 18px 14px 40px; gap: 18px; }
-    .detection-banner { padding: 16px 18px; gap: 12px; }
-    .detection-icon { width: 52px; height: 52px; font-size: 24px; }
-    .bins-grid { grid-template-columns: 1fr; }
-    .global-alert { padding: 14px 16px; gap: 12px; flex-wrap: wrap; }
-    .alert-big-icon { font-size: 28px; }
-  }
-
-  /* Offline overlay */
-  #offline-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(10,15,30,0.85);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(8px);
-  }
-
-  #offline-overlay.show { display: flex; }
-
-  .offline-box {
-    background: var(--panel);
-    border: 1px solid rgba(255,51,85,0.4);
-    border-radius: 24px;
-    padding: 40px 48px;
-    text-align: center;
-    box-shadow: var(--glow-red);
-    max-width: 340px;
-    width: 90%;
-  }
-
-  .offline-box .icon { font-size: 48px; margin-bottom: 16px; animation: pulse-dot 1.5s infinite; }
-  .offline-box h2 { font-family: 'Rajdhani', sans-serif; font-size: 22px; color: var(--accent-red); margin-bottom: 8px; }
-  .offline-box p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
-
-  .retry-btn {
-    margin-top: 20px;
-    background: rgba(0,170,255,0.1);
-    border: 1px solid var(--accent-blue);
-    border-radius: 10px;
-    padding: 10px 24px;
-    color: var(--accent-blue);
-    font-size: 13px;
-    font-family: 'Exo 2', sans-serif;
-    cursor: pointer;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    font-weight: 600;
-    transition: all 0.2s;
-  }
-
-  .retry-btn:hover { background: rgba(0,170,255,0.2); }
+/* ══════════════ RESET & ROOT ══════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --gradient-pos {
+  syntax: '<percentage>';
+  initial-value: 0%;
+  inherits: false;
+}
+
+:root{
+  --c-bg:        #f1f5f9;
+  --c-bg2:       #e8eef5;
+  --c-surface:   #ffffff;
+  --c-surface2:  #f8fafc;
+  --c-surface3:  #f1f5f9;
+  --c-border:    #e2e8f0;
+  --c-border2:   #cbd5e1;
+
+  --c-green:     #059669;
+  --c-green2:    #10b981;
+  --c-green3:    #34d399;
+  --c-green4:    #6ee7b7;
+  --c-green-bg:  #ecfdf5;
+  --c-green-txt: #064e3b;
+
+  --c-amber:     #d97706;
+  --c-amber2:    #f59e0b;
+  --c-amber-bg:  #fffbeb;
+  --c-amber-txt: #78350f;
+
+  --c-red:       #dc2626;
+  --c-red2:      #ef4444;
+  --c-red-bg:    #fef2f2;
+  --c-red-txt:   #7f1d1d;
+
+  --c-blue:      #2563eb;
+  --c-blue2:     #3b82f6;
+  --c-blue-bg:   #eff6ff;
+  --c-blue-txt:  #1e3a8a;
+
+  --c-text:      #0f172a;
+  --c-text2:     #1e293b;
+  --c-text3:     #475569;
+  --c-text4:     #94a3b8;
+  --c-text5:     #cbd5e1;
+
+  --f-sans:  'Inter', system-ui, sans-serif;
+  --f-mono:  'JetBrains Mono', monospace;
+
+  --r-sm:  8px;
+  --r-md:  12px;
+  --r-lg:  16px;
+  --r-xl:  20px;
+  --r-2xl: 24px;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body{
+  background: var(--c-bg);
+  font-family: var(--f-sans);
+  color: var(--c-text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ══════════════ NOISE TEXTURE OVERLAY ══════════════ */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px;
+  pointer-events:none;z-index:0;opacity:0.6;
+}
+
+/* ══════════════ MESH GRADIENT BG ══════════════ */
+.mesh-bg{
+  position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+}
+.mesh-blob{
+  position:absolute;border-radius:50%;
+  filter:blur(80px);opacity:0.35;
+  animation: blob-drift var(--dur,20s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+.mesh-blob:nth-child(1){
+  width:600px;height:600px;top:-200px;left:-100px;
+  background:radial-gradient(circle,#bbf7d0,#6ee7b7,transparent 70%);
+  --dur:18s;
+}
+.mesh-blob:nth-child(2){
+  width:500px;height:500px;top:40%;right:-150px;
+  background:radial-gradient(circle,#bfdbfe,#93c5fd,transparent 70%);
+  --dur:22s;animation-delay:-5s;
+}
+.mesh-blob:nth-child(3){
+  width:400px;height:400px;bottom:-100px;left:30%;
+  background:radial-gradient(circle,#fde68a,#fcd34d,transparent 70%);
+  --dur:25s;animation-delay:-10s;opacity:0.2;
+}
+@keyframes blob-drift{
+  0%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(40px,-30px) scale(1.05)}
+  66%{transform:translate(-20px,40px) scale(0.95)}
+  100%{transform:translate(20px,10px) scale(1.02)}
+}
+
+/* ══════════════ LOADER ══════════════ */
+#loader{
+  position:fixed;inset:0;z-index:9999;
+  background:#f0fdf4;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;
+  overflow:hidden;
+}
+#loader::before{
+  content:'';position:absolute;inset:0;
+  background:conic-gradient(from var(--angle), transparent 70%, rgba(5,150,105,0.06) 100%);
+  animation: spin-slow 8s linear infinite;
+  --angle:0deg;
+}
+@keyframes spin-slow{ to{ --angle:360deg } }
+
+.loader-logo{
+  display:flex;flex-direction:column;align-items:center;gap:20px;position:relative;
+}
+.loader-icon-ring{
+  position:relative;width:96px;height:96px;
+}
+.loader-icon-ring svg.ring-svg{
+  position:absolute;inset:0;width:100%;height:100%;
+  animation:spin 2s linear infinite;
+}
+.loader-icon-ring svg.ring-svg:nth-child(2){animation-duration:3s;animation-direction:reverse;opacity:0.5}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.loader-icon-center{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+}
+.loader-icon-center .icon-box{
+  width:52px;height:52px;border-radius:16px;
+  background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+  border:1.5px solid rgba(5,150,105,0.3);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(5,150,105,0.15);
+}
+.loader-icon-center svg{width:24px;height:24px;color:#059669}
+
+.loader-title{
+  font-family:var(--f-sans);font-size:26px;font-weight:800;
+  letter-spacing:-0.8px;color:#0f172a;
+}
+.loader-title span{
+  background:linear-gradient(135deg,#059669,#10b981,#34d399);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.loader-sub{
+  font-family:var(--f-mono);font-size:10px;
+  color:#94a3b8;letter-spacing:0.2em;text-transform:uppercase;margin-top:4px;
+  text-align:center;
+}
+
+.loader-progress{
+  width:260px;display:flex;flex-direction:column;gap:10px;align-items:center;
+  position:relative;
+}
+.loader-bar{
+  width:100%;height:3px;background:#e2e8f0;border-radius:99px;overflow:hidden;
+}
+.loader-bar-fill{
+  height:100%;
+  background:linear-gradient(90deg,#059669,#10b981,#34d399);
+  background-size:200%;
+  border-radius:99px;
+  animation:load-bar 2s var(--ease-in-out) forwards, bar-shimmer 1.5s linear infinite;
+}
+@keyframes load-bar{0%{width:0%;opacity:0.7}100%{width:100%;opacity:1}}
+@keyframes bar-shimmer{0%{background-position:0%}100%{background-position:200%}}
+
+.loader-pct{
+  font-family:var(--f-mono);font-size:11px;color:#64748b;
+  letter-spacing:0.05em;
+}
+#loader-pct-num{display:inline-block;min-width:28px;text-align:right;color:#059669;font-weight:600}
+
+#loader.fade-out{animation:loader-exit 0.6s var(--ease-in-out) forwards}
+@keyframes loader-exit{to{opacity:0;transform:scale(0.98);pointer-events:none}}
+
+/* ══════════════ HEADER ══════════════ */
+header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(255,255,255,0.8);
+  backdrop-filter:blur(20px) saturate(200%);
+  -webkit-backdrop-filter:blur(20px) saturate(200%);
+  border-bottom:1px solid rgba(226,232,240,0.7);
+}
+/* Animated border bottom */
+header::after{
+  content:'';
+  position:absolute;bottom:-1px;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--c-green3),var(--c-green2),transparent);
+  background-size:400%;
+  animation:header-line 4s linear infinite;
+}
+@keyframes header-line{0%{background-position:0%}100%{background-position:400%}}
+
+.header-inner{
+  max-width:1280px;margin:0 auto;
+  padding:0 24px;height:60px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none}
+.brand-mark{
+  width:38px;height:38px;border-radius:11px;
+  background:linear-gradient(135deg,#059669,#10b981);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 10px rgba(5,150,105,0.3);
+  position:relative;overflow:hidden;flex-shrink:0;
+}
+.brand-mark::before{
+  content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+  background:conic-gradient(from 0deg,transparent 75%,rgba(255,255,255,0.25));
+  animation:spin 3s linear infinite;
+}
+.brand-mark svg{width:17px;height:17px;color:#fff;position:relative;z-index:1}
+.brand-text-wrap{}
+.brand-name{
+  font-size:14px;font-weight:700;color:var(--c-text);
+  letter-spacing:-0.3px;line-height:1.2;
+}
+.brand-sub{
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-text4);letter-spacing:0.1em;
+}
+
+.header-center{
+  flex:1;display:flex;align-items:center;justify-content:center;
+}
+.header-time{
+  font-family:var(--f-mono);font-size:11px;color:var(--c-text3);
+  letter-spacing:0.08em;
+  background:var(--c-surface2);
+  border:1px solid var(--c-border);
+  padding:5px 12px;border-radius:99px;
+}
+
+.mqtt-badge{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 14px;border-radius:99px;
+  background:var(--c-surface);
+  border:1px solid var(--c-border);
+  font-family:var(--f-mono);font-size:10.5px;
+  color:var(--c-text3);letter-spacing:0.05em;
+  box-shadow:0 1px 3px rgba(15,23,42,0.06);
+  transition:all 0.35s var(--ease-out);
+  white-space:nowrap;
+}
+.mqtt-badge.ok{
+  background:var(--c-green-bg);
+  border-color:rgba(5,150,105,0.25);
+  color:var(--c-green-txt);
+}
+.mqtt-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--c-text5);
+  flex-shrink:0;transition:all 0.35s;
+}
+.mqtt-dot.green{
+  background:var(--c-green2);
+  box-shadow:0 0 0 2px rgba(16,185,129,0.2);
+  animation:ping-dot 2.5s ease infinite;
+}
+.mqtt-dot.amber{background:var(--c-amber2);animation:blink 1s ease infinite}
+.mqtt-dot.red{background:var(--c-red2);animation:ping-dot-red 2s ease infinite}
+@keyframes ping-dot{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.4)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+@keyframes ping-dot-red{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
+
+/* ══════════════ LAYOUT ══════════════ */
+main{
+  max-width:1280px;margin:0 auto;
+  padding:28px 24px 80px;
+  position:relative;z-index:1;
+}
+
+/* ══════════════ DASHBOARD GRID ══════════════ */
+/* Tight unified dashboard layout */
+.dashboard{
+  display:grid;
+  grid-template-rows:auto auto auto;
+  gap:0; /* no gap — we use padding inside panels */
+}
+
+/* ══════════════ TOP BAR (hero + stats fused) ══════════════ */
+.top-panel{
+  background:var(--c-surface);
+  border:1px solid var(--c-border);
+  border-radius:var(--r-2xl);
+  overflow:hidden;
+  margin-bottom:16px;
+  box-shadow:0 1px 3px rgba(15,23,42,0.06),0 4px 20px rgba(15,23,42,0.04);
+  /* Gradient mesh inside card */
+  position:relative;
+}
+.top-panel::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(5,150,105,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 100% 100%, rgba(37,99,235,0.03) 0%, transparent 50%);
+  pointer-events:none;
+}
+
+.top-panel-inner{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:0;
+}
+.hero-section{
+  padding:28px 32px;
+  border-right:1px solid var(--c-border);
+  position:relative;
+}
+.stats-section{
+  padding:20px 24px;
+  display:flex;flex-direction:column;gap:4px;
+  min-width:260px;
+}
+
+/* Hero content */
+.hero-badge{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:4px 12px 4px 8px;border-radius:99px;
+  background:var(--c-green-bg);
+  border:1px solid rgba(5,150,105,0.2);
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-green);letter-spacing:0.12em;
+  text-transform:uppercase;font-weight:600;
+  margin-bottom:14px;
+}
+.hero-badge-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--c-green2);
+  animation:ping-dot 2s ease infinite;
+}
+h1.hero-title{
+  font-size:clamp(24px,3.5vw,36px);
+  font-weight:800;letter-spacing:-1.5px;
+  color:var(--c-text);line-height:1.08;
+  margin-bottom:10px;
+}
+h1.hero-title em{
+  font-style:normal;
+  background:linear-gradient(135deg,var(--c-green),var(--c-green2),var(--c-green3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-desc{
+  font-size:13px;color:var(--c-text3);
+  line-height:1.6;max-width:420px;margin-bottom:20px;
+}
+
+.hero-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
+.htag{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:6px;
+  font-family:var(--f-mono);font-size:10px;
+  font-weight:500;letter-spacing:0.04em;
+}
+.htag-dot{width:5px;height:5px;border-radius:50%}
+.htag.htag-default{background:var(--c-surface2);border:1px solid var(--c-border);color:var(--c-text3)}
+.htag.htag-warn{background:var(--c-amber-bg);border:1px solid rgba(217,119,6,0.2);color:var(--c-amber-txt)}
+.htag.htag-danger{background:var(--c-red-bg);border:1px solid rgba(220,38,38,0.2);color:var(--c-red-txt)}
+.htag-dot{width:5px;height:5px;border-radius:50%}
+.htag.htag-default .htag-dot{background:var(--c-green2)}
+.htag.htag-warn .htag-dot{background:var(--c-amber2)}
+.htag.htag-danger .htag-dot{background:var(--c-red2)}
+
+.hero-btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:var(--r-md);
+  font-family:var(--f-sans);font-size:12.5px;font-weight:600;
+  cursor:pointer;border:none;
+  transition:all 0.18s var(--ease-out);
+  letter-spacing:0.01em;
+  position:relative;overflow:hidden;
+  user-select:none;
+}
+.btn svg{width:14px;height:14px;flex-shrink:0}
+.btn::after{
+  content:'';position:absolute;inset:0;
+  background:rgba(255,255,255,0);
+  transition:background 0.15s;
+}
+.btn:hover::after{background:rgba(255,255,255,0.1)}
+.btn:active{transform:scale(0.96)}
+
+.btn-primary{
+  background:linear-gradient(135deg,#059669,#10b981);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(5,150,105,0.3),inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-primary:hover{
+  box-shadow:0 4px 16px rgba(5,150,105,0.4),inset 0 1px 0 rgba(255,255,255,0.15);
+  transform:translateY(-1px);
+}
+.btn-danger{
+  background:linear-gradient(135deg,#dc2626,#ef4444);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(220,38,38,0.25),inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.btn-danger:hover{box-shadow:0 4px 16px rgba(220,38,38,0.35);transform:translateY(-1px)}
+.btn-ghost{
+  background:var(--c-surface);
+  border:1.5px solid var(--c-border2);
+  color:var(--c-text2);
+  box-shadow:0 1px 3px rgba(15,23,42,0.06);
+}
+.btn-ghost:hover{background:var(--c-surface2);border-color:var(--c-text4);transform:translateY(-1px)}
+
+/* Stats section (right side of top panel) */
+.stat-row{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;border-radius:var(--r-lg);
+  background:var(--c-surface2);
+  border:1px solid var(--c-border);
+  transition:all 0.2s var(--ease-out);
+  position:relative;overflow:hidden;
+}
+.stat-row:hover{background:var(--c-surface);box-shadow:0 2px 8px rgba(15,23,42,0.06)}
+.stat-row-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.stat-row-icon svg{width:16px;height:16px}
+.stat-row-icon.green{background:var(--c-green-bg);border:1px solid rgba(5,150,105,0.2)}
+.stat-row-icon.green svg{color:var(--c-green)}
+.stat-row-icon.red{background:var(--c-red-bg);border:1px solid rgba(220,38,38,0.15)}
+.stat-row-icon.red svg{color:var(--c-red)}
+.stat-row-icon.blue{background:var(--c-blue-bg);border:1px solid rgba(37,99,235,0.15)}
+.stat-row-icon.blue svg{color:var(--c-blue)}
+.stat-row-icon.amber{background:var(--c-amber-bg);border:1px solid rgba(217,119,6,0.15)}
+.stat-row-icon.amber svg{color:var(--c-amber)}
+
+.stat-row-body{flex:1;min-width:0}
+.stat-row-label{
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-text4);letter-spacing:0.12em;
+  text-transform:uppercase;margin-bottom:3px;font-weight:500;
+}
+.stat-row-value{
+  font-size:22px;font-weight:800;
+  color:var(--c-text);letter-spacing:-0.8px;line-height:1;
+}
+.stat-row-value.green{color:var(--c-green)}
+.stat-row-value.red{color:var(--c-red)}
+.stat-row-value.blue{color:var(--c-blue)}
+.stat-row-value.amber{color:var(--c-amber)}
+.stat-row-meta{
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-text4);margin-top:2px;
+}
+
+/* ══════════════ BINS SECTION LABEL ══════════════ */
+.bins-label{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.bins-label-left{display:flex;align-items:center;gap:10px}
+.bins-label-title{
+  font-size:13px;font-weight:700;color:var(--c-text2);
+  letter-spacing:-0.2px;
+}
+.bins-label-badge{
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-text4);
+  background:var(--c-surface);border:1px solid var(--c-border);
+  padding:2px 9px;border-radius:99px;letter-spacing:0.06em;
+}
+.bins-label-time{
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-text4);letter-spacing:0.06em;
+}
+
+/* ══════════════ BINS GRID ══════════════ */
+.bins-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+}
+@media(max-width:1100px){.bins-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.bins-grid{grid-template-columns:1fr}}
+
+/* ══════════════ BIN CARD — UNIFIED ══════════════ */
+.bin-card{
+  background:var(--c-surface);
+  border:1px solid var(--c-border);
+  border-radius:var(--r-xl);
+  overflow:hidden;
+  position:relative;
+  transition:
+    transform 0.3s var(--ease-spring),
+    box-shadow 0.3s var(--ease-out),
+    border-color 0.3s;
+  box-shadow:0 1px 3px rgba(15,23,42,0.06);
+  animation:slide-up 0.55s var(--ease-out) both;
+  cursor:default;
+  /* Rotating conic gradient border on hover */
+  --card-glow:transparent;
+}
+@keyframes slide-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* Animated gradient border */
+.bin-card::before{
+  content:'';
+  position:absolute;inset:-1px;border-radius:calc(var(--r-xl) + 1px);
+  background:conic-gradient(from var(--angle), var(--c-border) 80%, var(--card-glow) 100%);
+  z-index:-1;
+  animation:border-rotate 3s linear infinite paused;
+}
+.bin-card:hover::before{animation-play-state:running}
+.bin-card:hover{
+  --card-glow:var(--c-green3);
+  transform:translateY(-4px);
+  box-shadow:0 12px 40px rgba(15,23,42,0.1),0 4px 12px rgba(15,23,42,0.06);
+}
+@keyframes border-rotate{to{--angle:360deg}}
+
+.bin-card.warn{
+  border-color:rgba(217,119,6,0.35);
+  background:linear-gradient(160deg,#fffbeb 0%,#ffffff 40%);
+}
+.bin-card.warn:hover{--card-glow:var(--c-amber2)}
+.bin-card.danger{
+  border-color:rgba(220,38,38,0.35);
+  background:linear-gradient(160deg,#fef2f2 0%,#ffffff 40%);
+}
+.bin-card.danger:hover{--card-glow:var(--c-red2)}
+.bin-card.offline{
+  opacity:0.55;pointer-events:none;
+  border-color:rgba(220,38,38,0.15);
+}
+
+/* Card inner padding */
+.card-body{padding:18px 18px 16px}
+
+/* Top indicator strip */
+.card-strip{
+  height:2.5px;
+  background:linear-gradient(90deg,var(--c-green),var(--c-green2),var(--c-green3),var(--c-green2),var(--c-green));
+  background-size:300%;
+  animation:strip-flow 3s linear infinite;
+  transition:background 0.4s;
+}
+.bin-card.warn .card-strip{background:linear-gradient(90deg,var(--c-amber),var(--c-amber2),#fbbf24,var(--c-amber2),var(--c-amber));background-size:300%;animation:strip-flow 2s linear infinite}
+.bin-card.danger .card-strip{background:linear-gradient(90deg,var(--c-red),var(--c-red2),#f87171,var(--c-red2),var(--c-red));background-size:300%;animation:strip-flow 1.2s linear infinite}
+@keyframes strip-flow{0%{background-position:0%}100%{background-position:300%}}
+
+/* Card header */
+.card-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:16px;
+}
+.card-id{
+  font-family:var(--f-mono);font-size:9px;
+  letter-spacing:0.15em;color:var(--c-text4);
+  text-transform:uppercase;margin-bottom:3px;font-weight:500;
+}
+.card-name{
+  font-size:14px;font-weight:700;color:var(--c-text);letter-spacing:-0.3px;
+}
+.card-tag{
+  font-family:var(--f-mono);font-size:8.5px;font-weight:600;
+  padding:3px 8px;border-radius:6px;
+  letter-spacing:0.08em;text-transform:uppercase;
+  margin-top:2px;
+}
+.tag-org{
+  background:var(--c-green-bg);border:1px solid rgba(5,150,105,0.2);color:var(--c-green-txt);
+}
+.tag-inorg{
+  background:var(--c-blue-bg);border:1px solid rgba(37,99,235,0.18);color:var(--c-blue-txt);
+}
+
+/* ── Gauge ── */
+.gauge-row{
+  display:flex;align-items:center;gap:14px;
+  margin-bottom:14px;
+}
+.gauge-wrap{
+  position:relative;width:76px;height:76px;flex-shrink:0;
+}
+.gauge-wrap svg{width:100%;height:100%}
+.gauge-track{fill:none;stroke:var(--c-surface3);stroke-width:6.5}
+.gauge-arc{
+  fill:none;stroke:var(--c-green2);stroke-width:6.5;
+  stroke-linecap:round;
+  transform:rotate(-90deg);transform-origin:50% 50%;
+  stroke-dasharray:201.06;stroke-dashoffset:201.06;
+  transition:stroke-dashoffset 1.1s var(--ease-in-out),stroke 0.4s;
+  filter:drop-shadow(0 0 4px currentColor);
+}
+.gauge-center{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1px;
+}
+.gauge-pct{
+  font-size:17px;font-weight:800;color:var(--c-text);
+  letter-spacing:-0.5px;line-height:1;
+  transition:color 0.4s;
+}
+.gauge-unit{
+  font-family:var(--f-mono);font-size:8px;
+  color:var(--c-text4);letter-spacing:0.08em;
+}
+
+.gauge-meta{flex:1;min-width:0}
+.meta-row{display:flex;flex-direction:column;gap:0}
+.meta-key{
+  font-family:var(--f-mono);font-size:8.5px;
+  color:var(--c-text4);letter-spacing:0.12em;
+  text-transform:uppercase;margin-bottom:2px;font-weight:500;
+}
+.meta-val{
+  font-size:20px;font-weight:800;color:var(--c-text);
+  letter-spacing:-0.6px;line-height:1.1;
+}
+.meta-val span{
+  font-size:12px;font-weight:400;color:var(--c-text4);
+  font-family:var(--f-mono);
+}
+.meta-remain{
+  font-family:var(--f-mono);font-size:9.5px;
+  color:var(--c-text4);margin-top:6px;
+}
+
+/* ── Bar ── */
+.bar-track{
+  height:5px;background:var(--c-surface3);
+  border-radius:99px;overflow:hidden;
+  box-shadow:inset 0 1px 2px rgba(15,23,42,0.06);
+  margin-bottom:8px;
+}
+.bar-fill{
+  height:100%;border-radius:99px;width:0%;
+  background:linear-gradient(90deg,var(--c-green),var(--c-green2),var(--c-green3));
+  transition:width 1s var(--ease-in-out),background 0.4s;
+  position:relative;
+}
+.bar-fill::after{
+  content:'';position:absolute;inset:0;border-radius:99px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.45),transparent);
+  background-size:200%;animation:shimmer 2s linear infinite;
+}
+@keyframes shimmer{0%{background-position:-200%}100%{background-position:200%}}
+.bar-fill.warn{background:linear-gradient(90deg,var(--c-amber),var(--c-amber2),#fbbf24)}
+.bar-fill.danger{background:linear-gradient(90deg,var(--c-red),var(--c-red2),#f87171)}
+
+/* ── Segment dots ── */
+.segs{display:flex;gap:2.5px;margin-bottom:13px}
+.seg{
+  flex:1;height:3.5px;border-radius:99px;
+  background:var(--c-surface3);
+  transition:background 0.25s,transform 0.2s;
+}
+.seg.on{transform:scaleY(2)}
+
+/* ── Status chip ── */
+.status-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:99px;
+  font-family:var(--f-mono);font-size:9.5px;
+  font-weight:600;letter-spacing:0.06em;
+  transition:all 0.3s;
+}
+.chip-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.chip-load{background:var(--c-surface2);border:1px solid var(--c-border);color:var(--c-text4)}
+.chip-load .chip-dot{background:var(--c-text5)}
+.chip-ok{background:var(--c-green-bg);border:1px solid rgba(5,150,105,0.22);color:var(--c-green-txt)}
+.chip-ok .chip-dot{background:var(--c-green2)}
+.chip-full{background:var(--c-red-bg);border:1px solid rgba(220,38,38,0.22);color:var(--c-red-txt)}
+.chip-full .chip-dot{background:var(--c-red2);animation:blink 0.9s ease infinite}
+
+/* ── Offline banner ── */
+.offline-banner{
+  display:none;align-items:center;gap:7px;
+  padding:8px 12px;border-radius:9px;
+  background:var(--c-red-bg);border:1px solid rgba(220,38,38,0.2);
+  color:#b91c1c;font-family:var(--f-mono);font-size:9.5px;
+  margin-bottom:14px;font-weight:600;letter-spacing:0.03em;
+}
+.offline-banner.show{display:flex}
+.offline-banner svg{width:12px;height:12px;flex-shrink:0;color:var(--c-red)}
+
+/* ── Open button ── */
+.open-btn{
+  width:100%;padding:9px 14px;border-radius:var(--r-md);
+  background:var(--c-surface2);
+  border:1.5px solid var(--c-border);
+  color:var(--c-text2);
+  font-family:var(--f-sans);font-size:12px;font-weight:600;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all 0.2s var(--ease-out);
+  margin-top:12px;position:relative;overflow:hidden;
+}
+.open-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(5,150,105,0),rgba(5,150,105,0));
+  transition:background 0.25s;
+}
+.open-btn:hover{
+  background:var(--c-green-bg);
+  border-color:rgba(5,150,105,0.35);
+  color:var(--c-green-txt);
+  transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(5,150,105,0.12);
+}
+.open-btn:active{transform:scale(0.97)}
+.open-btn svg{width:13px;height:13px;flex-shrink:0;transition:transform 0.2s}
+.open-btn:hover svg{transform:translateY(-2px)}
+.open-btn.sent{
+  background:var(--c-green-bg);border-color:rgba(5,150,105,0.3);color:var(--c-green-txt);
+}
+
+/* ══════════════ TOAST ══════════════ */
+#toast-container{
+  position:fixed;bottom:24px;right:24px;z-index:9998;
+  display:flex;flex-direction:column-reverse;gap:8px;
+  pointer-events:none;
+}
+.toast{
+  pointer-events:auto;
+  display:flex;align-items:center;gap:10px;
+  padding:11px 16px;border-radius:var(--r-lg);
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--c-border);
+  box-shadow:0 8px 32px rgba(15,23,42,0.12),0 0 0 1px rgba(255,255,255,0.6);
+  font-size:12.5px;font-weight:500;
+  color:var(--c-text2);max-width:320px;
+  animation:toast-in 0.4s var(--ease-spring);
+}
+@keyframes toast-in{from{transform:translateY(16px) scale(0.95);opacity:0}to{transform:none;opacity:1}}
+.toast.out{animation:toast-out 0.3s var(--ease-in-out) forwards}
+@keyframes toast-out{to{transform:translateX(16px);opacity:0}}
+.toast-icon{font-size:15px;flex-shrink:0}
+.toast-body{flex:1;min-width:0}
+.toast-title{font-weight:700;font-size:12px}
+.toast-msg{font-size:11.5px;color:var(--c-text3);margin-top:1px}
+.toast-bar{height:2px;border-radius:1px;margin-top:8px;animation:toast-bar 4.5s linear forwards}
+@keyframes toast-bar{from{width:100%}to{width:0%}}
+.toast.success .toast-bar{background:var(--c-green2)}
+.toast.danger  .toast-bar{background:var(--c-red2)}
+.toast.warn    .toast-bar{background:var(--c-amber2)}
+.toast.info    .toast-bar{background:var(--c-blue2)}
+
+.toast-close{
+  width:20px;height:20px;border-radius:50%;border:none;background:var(--c-surface2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--c-text4);font-size:13px;flex-shrink:0;
+  transition:all 0.15s;
+}
+.toast-close:hover{background:var(--c-surface3);color:var(--c-text)}
+
+/* ══════════════ FOOTER ══════════════ */
+footer{
+  position:relative;z-index:1;
+  padding:0 24px 40px;
+  display:flex;align-items:center;justify-content:center;
+}
+.footer-inner{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 20px;border-radius:99px;
+  background:rgba(255,255,255,0.7);
+  border:1px solid var(--c-border);
+  font-family:var(--f-mono);font-size:10px;
+  color:var(--c-text4);letter-spacing:0.1em;
+  backdrop-filter:blur(8px);
+}
+.footer-sep{width:3px;height:3px;border-radius:50%;background:var(--c-text5)}
+
+/* ══════════════ RIPPLE ══════════════ */
+.rpl-host{position:relative;overflow:hidden}
+.rpl{
+  position:absolute;border-radius:50%;
+  pointer-events:none;
+  animation:rpl-anim 0.55s linear;
+  transform-origin:center;
+}
+@keyframes rpl-anim{0%{transform:scale(0);opacity:0.4}100%{transform:scale(4);opacity:0}}
+
+/* ══════════════ ANIM DELAYS ══════════════ */
+.d1{animation-delay:.04s}.d2{animation-delay:.08s}
+.d3{animation-delay:.12s}.d4{animation-delay:.16s}
+.d5{animation-delay:.20s}.d6{animation-delay:.24s}
+.d7{animation-delay:.28s}.d8{animation-delay:.32s}
+
+/* ══════════════ RESPONSIVE ══════════════ */
+@media(max-width:900px){
+  .top-panel-inner{grid-template-columns:1fr}
+  .hero-section{border-right:none;border-bottom:1px solid var(--c-border)}
+  .stats-section{flex-direction:row;flex-wrap:wrap;gap:10px}
+  .stat-row{flex:1 1 calc(50% - 5px);min-width:140px}
+  .header-center{display:none}
+}
+@media(max-width:600px){
+  main{padding:16px 14px 60px}
+  .header-inner{padding:0 16px}
+  .hero-section{padding:20px 18px}
+  .stats-section{padding:16px 18px}
+  .stat-row{flex:1 1 100%}
+}
+
+/* ══════════════ SCROLL REVEAL ══════════════ */
+.reveal{
+  opacity:0;transform:translateY(16px);
+  transition:opacity 0.5s var(--ease-out),transform 0.5s var(--ease-out);
+}
+.reveal.visible{opacity:1;transform:none}
+
+/* ══════════════ CURSOR FOLLOWER ══════════════ */
+#cursor-glow{
+  position:fixed;pointer-events:none;z-index:9997;
+  width:400px;height:400px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(5,150,105,0.06) 0%,transparent 70%);
+  transform:translate(-50%,-50%);
+  transition:opacity 0.3s;
+  will-change:transform;
+}
 </style>
 </head>
 <body>
-<div class="wrapper">
 
-  <!-- HEADER -->
-  <header>
-    <div class="header-logos">
-      <img src="https://iuh.edu.vn/assets/images/iuh.png?v=51" alt="IUH Logo" class="logo-img" onerror="this.style.display='none'">
-      <div class="logo-divider"></div>
-      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTrU1lBOc42iJCRnW4Vn18cQ3Rx-IswmQv2fQ&s" alt="Khoa Logo" class="logo-img" onerror="this.style.display='none'">
-    </div>
-
-    <div class="header-title">
-      <h1>HỆ THỐNG THÙNG RÁC THÔNG MINH</h1>
-      <p>Smart Waste Management · IoT Dashboard</p>
-    </div>
-
-    <div class="connection-badge disconnected" id="connBadge">
-      <div class="dot pulse" id="connDot"></div>
-      <span id="connText">Đang kết nối...</span>
-    </div>
-  </header>
-
-  <main>
-
-    <!-- GLOBAL ALERT -->
-    <div class="global-alert" id="globalAlert">
-      <div class="alert-big-icon">🚨</div>
-      <div class="alert-big-text">
-        <h3>CẢNH BÁO: THÙNG RÁC ĐẦY!</h3>
-        <p>Vui lòng xử lý ngay để đảm bảo vệ sinh môi trường.</p>
-        <div class="alert-bins-list" id="alertBinsList"></div>
-      </div>
-    </div>
-
-    <!-- DETECTION BANNER -->
-    <div class="detection-banner" id="detectionBanner">
-      <div class="detection-icon" id="detectionIcon">🗑️</div>
-      <div class="detection-info">
-        <div class="detection-label">Nhận diện loại rác</div>
-        <div class="detection-type idle" id="detectionType">Chờ tín hiệu...</div>
-        <div class="detection-sub" id="detectionSub">Hệ thống đang sẵn sàng nhận tín hiệu phân loại</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-          <div class="servo-tag" id="servo1Tag">⚙️ SERVO 1: CHỜ</div>
-          <div class="servo-tag" id="servo2Tag">⚙️ SERVO 2: CHỜ</div>
-        </div>
-        <button class="buzzer-off-btn" onclick="sendBuzzerOff()">Tắt buzzer</button>
-      </div>
-      <div class="detection-time" id="detectionTime">--:--:--</div>
-    </div>
-
-    <!-- STATS -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-label">Lần phát hiện</div>
-        <div class="stat-value" id="statDetect">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Rác vô cơ</div>
-        <div class="stat-value" id="statInorganic" style="color:var(--accent-orange)">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Rác hữu cơ</div>
-        <div class="stat-value" id="statOrganic" style="color:var(--accent-green)">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Uptime</div>
-        <div class="stat-value" id="statUptime">00:00 <span>phút</span></div>
-      </div>
-    </div>
-
-    <!-- BINS -->
-    <div class="bins-section">
-      <h2>Trạng thái thùng rác</h2>
-      <div class="bins-grid">
-
-        <!-- BIN 1 -->
-        <div class="bin-card" id="bin1Card">
-          <div class="bin-header">
-            <div class="bin-title-group">
-              <div class="bin-icon" id="bin1Icon">♻️</div>
-              <div>
-                <div class="bin-name">Thùng Hữu Cơ</div>
-                <div class="bin-id">SENSOR · ID: S1</div>
-              </div>
-            </div>
-            <div class="bin-status-pill status-ok" id="bin1Pill">
-              <div class="status-dot"></div>
-              <span id="bin1PillText">Bình thường</span>
-            </div>
-          </div>
-
-          <div class="bin-fill-visual">
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
-              <div class="fill-percent" id="bin1Pct">—</div>
-              <div style="font-size:11px;color:var(--text-dim)">MỨC ĐẦY</div>
-            </div>
-            <div class="fill-bar-bg">
-              <div class="fill-bar-inner" id="bin1Bar" style="width:0%"></div>
-            </div>
-            <div class="fill-labels">
-              <span>TRỐNG</span>
-              <span>NGƯỠNG 15cm</span>
-              <span>ĐẦY</span>
-            </div>
-          </div>
-
-          <div class="distance-row">
-            <div class="dist-label">Khoảng cách</div>
-            <div class="dist-value" id="bin1Dist">-- cm</div>
-          </div>
-
-          <div class="alert-strip" id="bin1Alert">
-            <span class="alert-icon">🔔</span>
-            <span>Thùng hữu cơ đã ĐẦY — Cần xử lý ngay!</span>
-          </div>
-        </div>
-
-        <!-- BIN 2 -->
-        <div class="bin-card" id="bin2Card">
-          <div class="bin-header">
-            <div class="bin-title-group">
-              <div class="bin-icon" id="bin2Icon">🗂️</div>
-              <div>
-                <div class="bin-name">Thùng Vô Cơ</div>
-                <div class="bin-id">SENSOR · ID: S2</div>
-              </div>
-            </div>
-            <div class="bin-status-pill status-ok" id="bin2Pill">
-              <div class="status-dot"></div>
-              <span id="bin2PillText">Bình thường</span>
-            </div>
-          </div>
-
-          <div class="bin-fill-visual">
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
-              <div class="fill-percent" id="bin2Pct">—</div>
-              <div style="font-size:11px;color:var(--text-dim)">MỨC ĐẦY</div>
-            </div>
-            <div class="fill-bar-bg">
-              <div class="fill-bar-inner" id="bin2Bar" style="width:0%"></div>
-            </div>
-            <div class="fill-labels">
-              <span>TRỐNG</span>
-              <span>NGƯỠNG 15cm</span>
-              <span>ĐẦY</span>
-            </div>
-          </div>
-
-          <div class="distance-row">
-            <div class="dist-label">Khoảng cách</div>
-            <div class="dist-value" id="bin2Dist">-- cm</div>
-          </div>
-
-          <div class="alert-strip" id="bin2Alert">
-            <span class="alert-icon">🔔</span>
-            <span>Thùng vô cơ đã ĐẦY — Cần xử lý ngay!</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- LOG -->
-    <div class="log-section">
-      <div class="log-header">
-        <h2>📋 Nhật ký hoạt động</h2>
-        <button class="log-clear" onclick="clearLog()">Xoá log</button>
-      </div>
-      <div class="log-box" id="logBox">
-        <div class="log-entry">
-          <span class="log-time">--:--:--</span>
-          <span class="log-msg dim">Hệ thống khởi động, đang kết nối MQTT...</span>
-        </div>
-      </div>
-    </div>
-
-  </main>
+<!-- Mesh background -->
+<div class="mesh-bg" aria-hidden="true">
+  <div class="mesh-blob"></div>
+  <div class="mesh-blob"></div>
+  <div class="mesh-blob"></div>
 </div>
 
-<!-- OFFLINE OVERLAY -->
-<div id="offline-overlay">
-  <div class="offline-box">
-    <div class="icon">📡</div>
-    <h2>Mất kết nối MQTT</h2>
-    <p>Không thể kết nối tới broker.<br>Đang thử kết nối lại...</p>
-    <button class="retry-btn" onclick="initMQTT()">Thử lại</button>
+<!-- Cursor glow -->
+<div id="cursor-glow" aria-hidden="true"></div>
+
+<!-- ══════ LOADER ══════ -->
+<div id="loader" role="status" aria-label="Đang tải hệ thống">
+  <div class="loader-logo">
+    <div class="loader-icon-ring">
+      <svg class="ring-svg" viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="44" fill="none" stroke="rgba(5,150,105,0.2)" stroke-width="1.5"/>
+        <circle cx="48" cy="48" r="44" fill="none" stroke="#10b981" stroke-width="1.5"
+          stroke-dasharray="276" stroke-dashoffset="220" stroke-linecap="round"/>
+      </svg>
+      <svg class="ring-svg" viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="36" fill="none" stroke="rgba(5,150,105,0.1)" stroke-width="1.5"/>
+        <circle cx="48" cy="48" r="36" fill="none" stroke="#34d399" stroke-width="1.5"
+          stroke-dasharray="226" stroke-dashoffset="180" stroke-linecap="round"/>
+      </svg>
+      <div class="loader-icon-center">
+        <div class="icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="loader-title">Smart Bin <span>System</span></div>
+      <div class="loader-sub">IUH · ESP32 · MQTT · IoT</div>
+    </div>
+  </div>
+  <div class="loader-progress">
+    <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+    <div class="loader-pct">Khởi động hệ thống… <span id="loader-pct-num">0</span>%</div>
   </div>
 </div>
 
+<!-- ══════ TOAST ══════ -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ══════ HEADER ══════ -->
+<header>
+  <div class="header-inner">
+    <a class="brand" href="#" aria-label="Smart Bin System">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14H6L5 6"/>
+          <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+        </svg>
+      </div>
+      <div class="brand-text-wrap">
+        <div class="brand-name">Smart Bin System</div>
+        <div class="brand-sub">IUH · ESP32 · Real-time</div>
+      </div>
+    </a>
+
+    <div class="header-center">
+      <div class="header-time" id="live-time">--:--:--</div>
+    </div>
+
+    <div class="mqtt-badge" id="mqtt-badge">
+      <div class="mqtt-dot" id="mqtt-dot"></div>
+      <span id="mqtt-label">Đang kết nối...</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════ MAIN ══════ -->
+<main>
+
+  <!-- TOP PANEL: Hero + Stats fused -->
+  <div class="top-panel reveal" style="margin-bottom:16px">
+    <div class="top-panel-inner">
+
+      <!-- Hero -->
+      <div class="hero-section">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          Giám sát thời gian thực
+        </div>
+        <h1 class="hero-title">Tổng quan<br><em>thùng rác thông minh</em></h1>
+        <p class="hero-desc">Hệ thống IoT dùng ESP32 + MQTT · Phân loại hữu cơ &amp; vô cơ · Cảnh báo tự động.</p>
+        <div class="hero-tags">
+          <span class="htag htag-default"><span class="htag-dot"></span>Thùng cao 24 cm</span>
+          <span class="htag htag-warn"><span class="htag-dot"></span>Cảnh báo ≥ 50%</span>
+          <span class="htag htag-danger"><span class="htag-dot"></span>Nguy hiểm ≥ 75%</span>
+        </div>
+        <div class="hero-btns">
+          <button class="btn btn-danger rpl-host" id="btn-alarm-on" onclick="sendAudioCommand(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            Bật cảnh báo
+          </button>
+          <button class="btn btn-ghost rpl-host" id="btn-alarm-off" onclick="sendAudioCommand(0)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <line x1="1" y1="1" x2="23" y2="23"/>
+              <path d="M9.9 4.24A6 6 0 0 1 18 8c0 4.01-.81 5.95-1.6 7.1M6.53 6.53C6.19 7.24 6 8.09 6 8c0 7-3 9-3 9h14.34M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            Tắt cảnh báo
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-section">
+        <div class="stat-row">
+          <div class="stat-row-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="14" rx="2"/>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+          </div>
+          <div class="stat-row-body">
+            <div class="stat-row-label">Tổng thùng</div>
+            <div class="stat-row-value blue">4</div>
+          </div>
+          <div class="stat-row-meta">hệ thống</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-row-icon green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <div class="stat-row-body">
+            <div class="stat-row-label">Đang hoạt động</div>
+            <div class="stat-row-value green" id="stat-online">--</div>
+          </div>
+          <div class="stat-row-meta">online</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-row-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="stat-row-body">
+            <div class="stat-row-label">Cần kiểm tra</div>
+            <div class="stat-row-value red" id="stat-alert">--</div>
+          </div>
+          <div class="stat-row-meta">cảnh báo</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-row-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+          </div>
+          <div class="stat-row-body">
+            <div class="stat-row-label">Mức trung bình</div>
+            <div class="stat-row-value amber"><span id="stat-avg">--</span><span style="font-size:12px;color:var(--c-text4);font-weight:400;font-family:var(--f-mono)">%</span></div>
+          </div>
+          <div class="stat-row-meta">tổng thùng</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bins label -->
+  <div class="bins-label reveal">
+    <div class="bins-label-left">
+      <span class="bins-label-title">Giám sát thùng rác</span>
+      <span class="bins-label-badge">4 thùng · Live</span>
+    </div>
+    <span class="bins-label-time" id="last-update">Chưa có dữ liệu</span>
+  </div>
+
+  <!-- Bins grid -->
+  <div class="bins-grid">
+
+    <!-- BIN 1 -->
+    <div class="bin-card d5 reveal" id="card-1" data-tilt>
+      <div class="card-strip" id="strip-1"></div>
+      <div class="card-body">
+        <div class="offline-banner" id="offline-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Mất kết nối · Cần kiểm tra
+        </div>
+        <div class="card-header">
+          <div>
+            <div class="card-id">Thùng · 01</div>
+            <div class="card-name">Rác Vô Cơ</div>
+          </div>
+          <span class="card-tag tag-inorg">INORGANIC</span>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 76 76">
+              <circle class="gauge-track" cx="38" cy="38" r="30"/>
+              <circle class="gauge-arc" cx="38" cy="38" r="30" id="gauge-1" style="stroke-dasharray:188.5;stroke-dashoffset:188.5"/>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-pct" id="pct-1">--</span>
+              <span class="gauge-unit">%</span>
+            </div>
+          </div>
+          <div class="gauge-meta">
+            <div class="meta-key">Khoảng cách</div>
+            <div class="meta-val"><span id="dist-1">--</span><span> cm</span></div>
+            <div class="meta-remain" id="remain-1">Còn lại: --</div>
+          </div>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="bar-1"></div></div>
+        <div class="segs" id="segs-1">
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+        </div>
+        <div><span class="status-chip chip-load" id="status-1"><span class="chip-dot"></span>Đang tải...</span></div>
+        <button class="open-btn rpl-host" id="open-btn-1" onclick="openBinBtn(this,0)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
+          </svg>
+          Mở nắp thùng
+        </button>
+      </div>
+    </div>
+
+    <!-- BIN 2 -->
+    <div class="bin-card d6 reveal" id="card-2" data-tilt>
+      <div class="card-strip" id="strip-2"></div>
+      <div class="card-body">
+        <div class="offline-banner" id="offline-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Mất kết nối · Cần kiểm tra
+        </div>
+        <div class="card-header">
+          <div>
+            <div class="card-id">Thùng · 02</div>
+            <div class="card-name">Rác Hữu Cơ</div>
+          </div>
+          <span class="card-tag tag-org">ORGANIC</span>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 76 76">
+              <circle class="gauge-track" cx="38" cy="38" r="30"/>
+              <circle class="gauge-arc" cx="38" cy="38" r="30" id="gauge-2" style="stroke-dasharray:188.5;stroke-dashoffset:188.5"/>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-pct" id="pct-2">--</span>
+              <span class="gauge-unit">%</span>
+            </div>
+          </div>
+          <div class="gauge-meta">
+            <div class="meta-key">Khoảng cách</div>
+            <div class="meta-val"><span id="dist-2">--</span><span> cm</span></div>
+            <div class="meta-remain" id="remain-2">Còn lại: --</div>
+          </div>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="bar-2"></div></div>
+        <div class="segs" id="segs-2">
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+        </div>
+        <div><span class="status-chip chip-load" id="status-2"><span class="chip-dot"></span>Đang tải...</span></div>
+        <button class="open-btn rpl-host" id="open-btn-2" onclick="openBinBtn(this,1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
+          </svg>
+          Mở nắp thùng
+        </button>
+      </div>
+    </div>
+
+    <!-- BIN 3 -->
+    <div class="bin-card d7 reveal" id="card-3" data-tilt>
+      <div class="card-strip" id="strip-3"></div>
+      <div class="card-body">
+        <div class="offline-banner" id="offline-3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Mất kết nối · Cần kiểm tra
+        </div>
+        <div class="card-header">
+          <div>
+            <div class="card-id">Thùng · 03</div>
+            <div class="card-name">Rác Vô Cơ</div>
+          </div>
+          <span class="card-tag tag-inorg">INORGANIC</span>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 76 76">
+              <circle class="gauge-track" cx="38" cy="38" r="30"/>
+              <circle class="gauge-arc" cx="38" cy="38" r="30" id="gauge-3" style="stroke-dasharray:188.5;stroke-dashoffset:188.5"/>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-pct" id="pct-3">--</span>
+              <span class="gauge-unit">%</span>
+            </div>
+          </div>
+          <div class="gauge-meta">
+            <div class="meta-key">Khoảng cách</div>
+            <div class="meta-val"><span id="dist-3">--</span><span> cm</span></div>
+            <div class="meta-remain" id="remain-3">Còn lại: --</div>
+          </div>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="bar-3"></div></div>
+        <div class="segs" id="segs-3">
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+        </div>
+        <div><span class="status-chip chip-load" id="status-3"><span class="chip-dot"></span>Đang tải...</span></div>
+        <button class="open-btn rpl-host" id="open-btn-3" onclick="openBinBtn(this,2)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
+          </svg>
+          Mở nắp thùng
+        </button>
+      </div>
+    </div>
+
+    <!-- BIN 4 -->
+    <div class="bin-card d8 reveal" id="card-4" data-tilt>
+      <div class="card-strip" id="strip-4"></div>
+      <div class="card-body">
+        <div class="offline-banner" id="offline-4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Mất kết nối · Cần kiểm tra
+        </div>
+        <div class="card-header">
+          <div>
+            <div class="card-id">Thùng · 04</div>
+            <div class="card-name">Rác Hữu Cơ</div>
+          </div>
+          <span class="card-tag tag-org">ORGANIC</span>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 76 76">
+              <circle class="gauge-track" cx="38" cy="38" r="30"/>
+              <circle class="gauge-arc" cx="38" cy="38" r="30" id="gauge-4" style="stroke-dasharray:188.5;stroke-dashoffset:188.5"/>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-pct" id="pct-4">--</span>
+              <span class="gauge-unit">%</span>
+            </div>
+          </div>
+          <div class="gauge-meta">
+            <div class="meta-key">Khoảng cách</div>
+            <div class="meta-val"><span id="dist-4">--</span><span> cm</span></div>
+            <div class="meta-remain" id="remain-4">Còn lại: --</div>
+          </div>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="bar-4"></div></div>
+        <div class="segs" id="segs-4">
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+          <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+        </div>
+        <div><span class="status-chip chip-load" id="status-4"><span class="chip-dot"></span>Đang tải...</span></div>
+        <button class="open-btn rpl-host" id="open-btn-4" onclick="openBinBtn(this,3)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
+          </svg>
+          Mở nắp thùng
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /bins-grid -->
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>IUH Smart Waste</span>
+    <div class="footer-sep"></div>
+    <span>ESP32 + MQTT</span>
+    <div class="footer-sep"></div>
+    <span>Real-time Monitoring</span>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 <script>
-// ── STATE ────────────────────────────────────────────────────
-const THRESHOLD_CM = 15;
-const MAX_DISTANCE = 100; // for fill bar mapping
-const BROKER_URL = "wss://broker.hivemq.com:8884/mqtt";
+/* ══════════ CONFIG ══════════ */
+const BIN_HEIGHT = 24;
+const WARN_PCT   = 50;
+const DANGER_PCT = 75;
+const OFFLINE_MS = 15000;
+const MQTT_HOST  = "broker.hivemq.com";
+const MQTT_PORT  = 8884;
+const MQTT_PATH  = "/mqtt";
+const CLIENT_ID  = "WebApp_" + Math.random().toString(16).substr(2,8);
+const CIRCUMF    = 188.5; // 2*pi*30
 
-let mqttClient = null;
-let stats = { detect: 0, organic: 0, inorganic: 0 };
-let startTime = Date.now();
-let bin1IsFull = false, bin2IsFull = false;
+let mqttClient = null, MsgClass = null;
+const lastSeen    = {1:null,2:null,3:null,4:null};
+const offlineFlag = {1:false,2:false,3:false,4:false};
+const fillData    = {1:0,2:0,3:0,4:0};
 
-// ── LOG ──────────────────────────────────────────────────────
-function addLog(msg, type = 'dim') {
-  const box = document.getElementById('logBox');
+/* ══════════ CURSOR GLOW ══════════ */
+const cursorGlow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => {
+  cursorGlow.style.transform = `translate(${e.clientX - 200}px,${e.clientY - 200}px)`;
+});
+
+/* ══════════ LIVE CLOCK ══════════ */
+function updateClock(){
   const now = new Date();
-  const t = now.toTimeString().slice(0,8);
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
-  box.appendChild(entry);
-  // keep last 60
-  while (box.children.length > 60) box.removeChild(box.firstChild);
-  box.scrollTop = box.scrollHeight;
+  const t = now.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  const el = document.getElementById('live-time');
+  if(el) el.textContent = t;
 }
+setInterval(updateClock, 1000);
+updateClock();
 
-function clearLog() {
-  document.getElementById('logBox').innerHTML = '';
-  addLog('Log đã được xoá.', 'dim');
-}
+/* ══════════ LOADER ══════════ */
+let pctVal = 0;
+const pctEl = document.getElementById('loader-pct-num');
+const pctInterval = setInterval(()=>{
+  pctVal = Math.min(pctVal + Math.random()*12, 99);
+  if(pctEl) pctEl.textContent = Math.floor(pctVal);
+}, 180);
 
-// ── UPTIME ───────────────────────────────────────────────────
-setInterval(() => {
-  const mins = Math.floor((Date.now() - startTime) / 60000);
-  const h = Math.floor(mins / 60), m = mins % 60;
-  document.getElementById('statUptime').innerHTML =
-    h > 0 ? `${h}:<span style="font-size:12px;color:var(--text-dim)">${String(m).padStart(2,'0')} giờ</span>`
-           : `${m} <span>phút</span>`;
-}, 5000);
-
-// ── DETECTION BANNER ─────────────────────────────────────────
-function setDetection(type) {
-  const banner = document.getElementById('detectionBanner');
-  const icon = document.getElementById('detectionIcon');
-  const typeEl = document.getElementById('detectionType');
-  const subEl = document.getElementById('detectionSub');
-  const timeEl = document.getElementById('detectionTime');
-  const now = new Date().toTimeString().slice(0,8);
-
-  banner.className = 'detection-banner';
-  icon.className = 'detection-icon';
-  typeEl.className = 'detection-type';
-
-  if (type === 'inorganic') {
-    banner.classList.add('inorganic-active');
-    icon.classList.add('active-inorganic');
-    icon.textContent = '🗂️';
-    typeEl.classList.add('inorganic');
-    typeEl.textContent = 'RÁC VÔ CƠ';
-    subEl.textContent = 'Nhận diện rác vô cơ — Servo 2 đang mở thùng vô cơ';
-    stats.detect++; stats.inorganic++;
-    document.getElementById('servo2Tag').textContent = '⚙️ SERVO 2: ĐANG MỞ';
-    document.getElementById('servo2Tag').className = 'servo-tag active-tag';
-    addLog('Phát hiện RÁC VÔ CƠ — Servo 2 kích hoạt (tín hiệu: 0)', 'orange');
-    setTimeout(() => {
-      document.getElementById('servo2Tag').textContent = '⚙️ SERVO 2: CHỜ';
-      document.getElementById('servo2Tag').className = 'servo-tag';
-    }, 3500);
-  } else if (type === 'organic') {
-    banner.classList.add('organic-active');
-    icon.classList.add('active-organic');
-    icon.textContent = '♻️';
-    typeEl.classList.add('organic');
-    typeEl.textContent = 'RÁC HỮU CƠ';
-    subEl.textContent = 'Nhận diện rác hữu cơ — Servo 1 đang mở thùng hữu cơ';
-    stats.detect++; stats.organic++;
-    document.getElementById('servo1Tag').textContent = '⚙️ SERVO 1: ĐANG MỞ';
-    document.getElementById('servo1Tag').className = 'servo-tag active-tag';
-    addLog('Phát hiện RÁC HỮU CƠ — Servo 1 kích hoạt (tín hiệu: 1)', 'green');
-    setTimeout(() => {
-      document.getElementById('servo1Tag').textContent = '⚙️ SERVO 1: CHỜ';
-      document.getElementById('servo1Tag').className = 'servo-tag';
-    }, 3500);
-  }
-
-  timeEl.textContent = now;
-  document.getElementById('statDetect').textContent = stats.detect;
-  document.getElementById('statInorganic').textContent = stats.inorganic;
-  document.getElementById('statOrganic').textContent = stats.organic;
-}
-
-function sendBuzzerOff() {
-  if (!mqttClient || !mqttClient.connected) {
-    addLog('Không thể gửi tắt buzzer — MQTT chưa kết nối', 'red');
+window.addEventListener('load', () => {
+  if(!requestPassword()){
+    const loader = document.getElementById('loader');
+    if(loader) loader.style.display = 'none';
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f8fafc;font-family:Inter,system-ui,sans-serif;color:#0f172a;text-align:center;">
+        <div>
+          <h1 style="font-size:28px;margin-bottom:12px;">Truy cập bị từ chối</h1>
+          <p style="font-size:16px;color:#475569;">Bạn đã nhập mật khẩu sai hoặc hủy. Tải lại trang và thử lại.</p>
+        </div>
+      </div>`;
     return;
   }
 
-  mqttClient.publish('esp32/buzzer/control', 'off');
-  addLog('Đã gửi lệnh tắt buzzer', 'orange');
+  setTimeout(()=>{
+    clearInterval(pctInterval);
+    if(pctEl) pctEl.textContent = '100';
+    setTimeout(()=>{
+      const loader = document.getElementById('loader');
+      loader.classList.add('fade-out');
+      setTimeout(()=>{ loader.style.display='none'; },600);
+      setTimeout(()=>{ initMQTT(); startAllOfflineWatchers(); updateStats(); },400);
+    },300);
+  }, 2200);
+});
+
+/* ══════════ SCROLL REVEAL ═════════════ */
+const revealObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
+
+/* ══════════ RIPPLE ══════════ */
+function addRipple(el, e){
+  const r = document.createElement('span');
+  r.className = 'rpl';
+  const rect = el.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 2;
+  r.style.cssText = `
+    width:${size}px;height:${size}px;
+    left:${e.clientX - rect.left - size/2}px;
+    top:${e.clientY - rect.top - size/2}px;
+    background:rgba(15,23,42,0.07);
+  `;
+  el.appendChild(r);
+  setTimeout(()=>r.remove(),560);
+}
+document.querySelectorAll('.rpl-host').forEach(el=>{
+  el.addEventListener('click', e=>addRipple(el,e));
+});
+
+/* ══════════ 3D TILT ══════════ */
+document.querySelectorAll('[data-tilt]').forEach(card=>{
+  card.addEventListener('mousemove',e=>{
+    if(card.classList.contains('offline')) return;
+    const r = card.getBoundingClientRect();
+    const x = ((e.clientX - r.left)/r.width  - 0.5)*8;
+    const y = ((e.clientY - r.top) /r.height - 0.5)*8;
+    card.style.transform = `perspective(1000px) rotateX(${-y}deg) rotateY(${x}deg) translateY(-4px)`;
+  });
+  card.addEventListener('mouseleave',()=>{ card.style.transform=''; });
+});
+
+/* ══════════ TOAST ══════════ */
+const ICONS = {success:'✅', danger:'🚨', warn:'⚠️', info:'ℹ️'};
+function showToast(title, msg, type='info'){
+  const wrap = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `
+    <span class="toast-icon">${ICONS[type]||'ℹ️'}</span>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      ${msg ? `<div class="toast-msg">${msg}</div>` : ''}
+      <div class="toast-bar"></div>
+    </div>
+    <button class="toast-close" onclick="dismissToast(this.parentElement)">✕</button>
+  `;
+  wrap.appendChild(t);
+  setTimeout(()=>dismissToast(t), 4800);
+}
+function dismissToast(t){
+  if(!t || !t.parentElement) return;
+  t.classList.add('out');
+  setTimeout(()=>t.remove(),350);
 }
 
-// ── BIN STATUS UPDATE ─────────────────────────────────────────
-function updateBin(binNum, distance, isFull) {
-  const pctEl  = document.getElementById(`bin${binNum}Pct`);
-  const barEl  = document.getElementById(`bin${binNum}Bar`);
-  const distEl = document.getElementById(`bin${binNum}Dist`);
-  const card   = document.getElementById(`bin${binNum}Card`);
-  const pill   = document.getElementById(`bin${binNum}Pill`);
-  const pillTxt = document.getElementById(`bin${binNum}PillText`);
-  const alertEl = document.getElementById(`bin${binNum}Alert`);
-  const iconEl = document.getElementById(`bin${binNum}Icon`);
+/* ══════════ MQTT STATUS ══════════ */
+function setMqttState(text, state){
+  const dot   = document.getElementById('mqtt-dot');
+  const label = document.getElementById('mqtt-label');
+  const badge = document.getElementById('mqtt-badge');
+  label.textContent = text;
+  dot.className = 'mqtt-dot';
+  badge.classList.remove('ok');
+  if(state==='on')          { dot.classList.add('green'); badge.classList.add('ok'); }
+  else if(state==='connecting') dot.classList.add('amber');
+  else                          dot.classList.add('red');
+}
 
-  if (distance < 0) {
-    distEl.textContent = '-- cm';
-    pctEl.textContent = '—';
-    barEl.style.width = '0%';
-    return;
+/* ══════════ MQTT INIT ══════════ */
+function initMQTT(){
+  let CC = null;
+  if(typeof Paho !== 'undefined'){
+    if(Paho.Client)            { CC=Paho.Client; MsgClass=Paho.Message; }
+    else if(Paho.MQTT?.Client) { CC=Paho.MQTT.Client; MsgClass=Paho.MQTT.Message; }
+  }
+  if(!CC){ setMqttState("Lỗi tải MQTT",'off'); return; }
+
+  mqttClient = new CC(MQTT_HOST, MQTT_PORT, MQTT_PATH, CLIENT_ID);
+  mqttClient.onConnectionLost = r=>{
+    if(r.errorCode!==0){ setMqttState("Mất kết nối...",'off'); setTimeout(doConnect,5000); }
+  };
+  mqttClient.onMessageArrived = msg=>{
+    const p = msg.destinationName.split('/');
+    if(p.length===3 && p[0]==='esp32' && p[1].startsWith('bin')){
+      const id = p[1].replace('bin','');
+      if(p[2]==='distance') onDistance(id, parseFloat(msg.payloadString));
+      else if(p[2]==='status') onStatus(id, msg.payloadString);
+    }
+  };
+  doConnect();
+}
+
+function doConnect(){
+  setMqttState("Đang kết nối...",'connecting');
+  mqttClient.connect({
+    useSSL:true, timeout:10,
+    onSuccess:()=>{
+      setMqttState("Đã kết nối · Live",'on');
+      showToast("MQTT đã kết nối","Đang nhận dữ liệu thời gian thực",'success');
+      for(let i=1;i<=4;i++){
+        mqttClient.subscribe(`esp32/bin${i}/distance`);
+        mqttClient.subscribe(`esp32/bin${i}/status`);
+      }
+    },
+    onFailure:()=>{
+      setMqttState("Lỗi kết nối · Thử lại...",'off');
+      setTimeout(doConnect,5000);
+    }
+  });
+}
+
+function sendMsg(topic,val){
+  if(mqttClient?.isConnected()){
+    const m = new MsgClass(val.toString());
+    m.destinationName = topic;
+    mqttClient.send(m);
+  } else { showToast("Chưa kết nối","MQTT chưa sẵn sàng",'danger'); }
+}
+
+function openBin(id)          { sendMsg("esp32/servo/control",id); }
+function sendAudioCommand(v)  { sendMsg("esp32/audio/control",v); }
+
+function openBinBtn(btn, id){
+  openBin(id);
+  const orig = btn.innerHTML;
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:13px;height:13px"><polyline points="20 6 9 17 4 12"/></svg>Đã gửi lệnh!`;
+  btn.classList.add('sent');
+  showToast(`Mở thùng ${id+1}`, "Lệnh servo đã được gửi",'success');
+  setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('sent'); },2200);
+}
+
+/* ══════════ OFFLINE ══════════ */
+function startOfflineTimer(id){
+  if(lastSeen[id]) clearTimeout(lastSeen[id]);
+  if(offlineFlag[id]){
+    offlineFlag[id]=false;
+    document.getElementById(`offline-${id}`).classList.remove('show');
+    document.getElementById(`card-${id}`).classList.remove('offline');
+    showToast(`Thùng ${id} đã khôi phục`,"Kết nối trở lại bình thường",'success');
+  }
+  lastSeen[id] = setTimeout(()=>{
+    offlineFlag[id]=true;
+    document.getElementById(`offline-${id}`).classList.add('show');
+    document.getElementById(`card-${id}`).classList.add('offline');
+    showToast(`Thùng ${id} mất kết nối`,"Vui lòng kiểm tra thiết bị",'danger');
+    updateStats();
+  },OFFLINE_MS);
+}
+
+/* ══════════ STATS ══════════ */
+function updateStats(){
+  const online = [1,2,3,4].filter(i=>!offlineFlag[i]);
+  const alerts = [1,2,3,4].filter(i=>offlineFlag[i]||fillData[i]>=DANGER_PCT);
+  const filled = online.map(i=>fillData[i]);
+  const avg    = filled.length ? Math.round(filled.reduce((a,b)=>a+b,0)/filled.length) : 0;
+  document.getElementById('stat-online').textContent = online.length;
+  document.getElementById('stat-alert').textContent  = alerts.length;
+  document.getElementById('stat-avg').textContent    = avg;
+}
+
+/* ══════════ LAST UPDATE ══════════ */
+function updateTimestamp(){
+  const now = new Date();
+  document.getElementById('last-update').textContent =
+    'Cập nhật: ' + now.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+/* ══════════ DISTANCE ══════════ */
+const TOAST_THR = {};
+const PAGE_PASSWORD = "1234"; // Thay đổi mật khẩu nếu cần
+
+function requestPassword(){
+  const input = prompt("Nhập mật khẩu truy cập trang:");
+  if(input === null) return false;
+  if(input === PAGE_PASSWORD) return true;
+  alert("Mật khẩu không đúng. Vui lòng thử lại.");
+  return requestPassword();
+}
+
+function onDistance(id, dist){
+  startOfflineTimer(id);
+  updateTimestamp();
+
+  let fill = Math.max(0, Math.min(100, ((BIN_HEIGHT-dist)/BIN_HEIGHT)*100));
+  fillData[id] = fill;
+
+  const isDanger = fill >= DANGER_PCT;
+  const isWarn   = !isDanger && fill >= WARN_PCT;
+
+  /* % text */
+  const pctEl = document.getElementById(`pct-${id}`);
+  pctEl.textContent = Math.round(fill);
+  pctEl.style.color = isDanger ? 'var(--c-red)' : isWarn ? 'var(--c-amber)' : 'var(--c-green)';
+
+  /* dist */
+  document.getElementById(`dist-${id}`).textContent   = dist.toFixed(1);
+  document.getElementById(`remain-${id}`).textContent = `Còn lại: ${dist.toFixed(1)} cm`;
+
+  /* bar */
+  const bar = document.getElementById(`bar-${id}`);
+  bar.style.width = fill + '%';
+  bar.className   = 'bar-fill' + (isDanger?' danger':isWarn?' warn':'');
+
+  /* gauge — use 188.5 for r=30 */
+  const g = document.getElementById(`gauge-${id}`);
+  g.style.strokeDashoffset = 188.5 - (fill/100)*188.5;
+  g.style.stroke = isDanger ? 'var(--c-red2)' : isWarn ? 'var(--c-amber2)' : 'var(--c-green2)';
+  g.style.filter = `drop-shadow(0 0 5px ${isDanger?'rgba(239,68,68,0.5)':isWarn?'rgba(245,158,11,0.5)':'rgba(16,185,129,0.5)'})`;
+
+  /* segments */
+  const segs = document.getElementById(`segs-${id}`).querySelectorAll('.seg');
+  const cnt  = Math.round(fill/10);
+  const col  = isDanger ? 'var(--c-red2)' : isWarn ? 'var(--c-amber2)' : 'var(--c-green2)';
+  segs.forEach((s,i)=>{
+    s.className = 'seg'+(i<cnt?' on':'');
+    s.style.background = i<cnt ? col : '';
+  });
+
+  /* card state */
+  const card = document.getElementById(`card-${id}`);
+  card.classList.remove('warn','danger');
+  if(isDanger) card.classList.add('danger');
+  else if(isWarn) card.classList.add('warn');
+
+  /* toast throttle */
+  const key = `${id}-${isDanger?'d':isWarn?'w':'s'}`;
+  if(!TOAST_THR[key]){
+    TOAST_THR[key]=true; setTimeout(()=>delete TOAST_THR[key],60000);
+    if(isDanger)      showToast(`🚨 Thùng ${id} sắp đầy!`,`Mức hiện tại: ${Math.round(fill)}%`,'danger');
+    else if(isWarn)   showToast(`⚠ Thùng ${id} đầy dần`,`Mức hiện tại: ${Math.round(fill)}%`,'warn');
   }
 
-  distEl.textContent = distance.toFixed(1) + ' cm';
+  updateStats();
+}
 
-  // Fill % : khi distance = MAX_DISTANCE → 0%, distance = 0 → 100%
-  const pct = Math.max(0, Math.min(100, Math.round((1 - distance / MAX_DISTANCE) * 100)));
-  pctEl.textContent = pct + '%';
-  barEl.style.width = pct + '%';
-
-  if (isFull) {
-    card.classList.add('bin-full');
-    pill.className = 'bin-status-pill status-full';
-    pillTxt.textContent = '⚠ ĐẦY';
-    alertEl.classList.add('visible');
-    barEl.className = 'fill-bar-inner full-bar';
-    pctEl.className = 'fill-percent full-pct';
-    iconEl.textContent = binNum === 1 ? '🟥' : '🟥';
+/* ══════════ STATUS ══════════ */
+function onStatus(id, raw){
+  const el = document.getElementById(`status-${id}`);
+  if(!el) return;
+  const s = raw.toUpperCase().trim();
+  if(s==='FULL'){
+    el.className='status-chip chip-full';
+    el.innerHTML=`<span class="chip-dot"></span>Đầy · FULL`;
+  } else if(s==='EMPTY'){
+    el.className='status-chip chip-ok';
+    el.innerHTML=`<span class="chip-dot"></span>Trống · EMPTY`;
   } else {
-    card.classList.remove('bin-full');
-    pill.className = 'bin-status-pill status-ok';
-    pillTxt.textContent = 'Bình thường';
-    alertEl.classList.remove('visible');
-    barEl.className = 'fill-bar-inner';
-    pctEl.className = 'fill-percent';
-    iconEl.textContent = binNum === 1 ? '♻️' : '🗂️';
-  }
-
-  if (binNum === 1) bin1IsFull = isFull;
-  if (binNum === 2) bin2IsFull = isFull;
-  updateGlobalAlert();
-}
-
-function updateGlobalAlert() {
-  const alertEl = document.getElementById('globalAlert');
-  const listEl = document.getElementById('alertBinsList');
-
-  if (bin1IsFull || bin2IsFull) {
-    alertEl.classList.add('visible');
-    let chips = '';
-    if (bin1IsFull) chips += '<div class="alert-bin-chip">♻️ Thùng Hữu Cơ</div>';
-    if (bin2IsFull) chips += '<div class="alert-bin-chip">🗂️ Thùng Vô Cơ</div>';
-    listEl.innerHTML = chips;
-  } else {
-    alertEl.classList.remove('visible');
+    el.className='status-chip chip-load';
+    el.innerHTML=`<span class="chip-dot"></span>${raw}`;
   }
 }
 
-// ── MQTT ──────────────────────────────────────────────────────
-function initMQTT() {
-  document.getElementById('offline-overlay').classList.remove('show');
-
-  if (mqttClient) { try { mqttClient.end(true); } catch(e){} }
-
-  const clientId = 'web_' + Math.random().toString(16).slice(2, 8);
-  mqttClient = mqtt.connect(BROKER_URL, {
-    clientId,
-    clean: true,
-    connectTimeout: 10000,
-    reconnectPeriod: 4000,
-  });
-
-  mqttClient.on('connect', () => {
-    updateConnection(true);
-    addLog('Kết nối MQTT thành công: ' + BROKER_URL, 'green');
-
-    mqttClient.subscribe('esp32/servo/control');
-    mqttClient.subscribe('esp32/ultrasonic/sensor1');
-    mqttClient.subscribe('esp32/ultrasonic/sensor2');
-    mqttClient.subscribe('esp32/ultrasonic/status1');
-    mqttClient.subscribe('esp32/ultrasonic/status2');
-    addLog('Đã đăng ký 5 topics', 'blue');
-  });
-
-  mqttClient.on('message', (topic, payload) => {
-    const msg = payload.toString().trim();
-    handleMessage(topic, msg);
-  });
-
-  mqttClient.on('error', (err) => {
-    addLog('Lỗi MQTT: ' + err.message, 'red');
-    updateConnection(false);
-  });
-
-  mqttClient.on('offline', () => {
-    updateConnection(false);
-    addLog('Mất kết nối MQTT...', 'red');
-  });
-
-  mqttClient.on('reconnect', () => {
-    addLog('Đang kết nối lại...', 'dim');
-    updateConnection(false);
+/* ══════════ INITIAL OFFLINE WATCHERS ══════════ */
+function startAllOfflineWatchers(){
+  [1,2,3,4].forEach(id=>{
+    lastSeen[id] = setTimeout(()=>{
+      offlineFlag[id]=true;
+      document.getElementById(`offline-${id}`).classList.add('show');
+      document.getElementById(`card-${id}`).classList.add('offline');
+      updateStats();
+    }, OFFLINE_MS);
   });
 }
-
-let lastStatus1 = null, lastStatus2 = null;
-
-function handleMessage(topic, msg) {
-  if (topic === 'esp32/servo/control') {
-    if (msg === '0') {
-      setDetection('inorganic');
-    } else if (msg === '1') {
-      setDetection('organic');
-    }
-  }
-  else if (topic === 'esp32/ultrasonic/sensor1') {
-    const d = parseFloat(msg);
-    const full = lastStatus1 === 'day';
-    if (!isNaN(d)) updateBin(1, d, full);
-  }
-  else if (topic === 'esp32/ultrasonic/sensor2') {
-    const d = parseFloat(msg);
-    const full = lastStatus2 === 'day';
-    if (!isNaN(d)) updateBin(2, d, full);
-  }
-  else if (topic === 'esp32/ultrasonic/status1') {
-    lastStatus1 = msg;
-    if (msg === 'day') {
-      addLog('Cảm biến 1: Thùng hữu cơ ĐẦY', 'red');
-      updateBin(1, parseFloat(document.getElementById('bin1Dist').textContent) || -1, true);
-    } else {
-      updateBin(1, parseFloat(document.getElementById('bin1Dist').textContent) || -1, false);
-    }
-  }
-  else if (topic === 'esp32/ultrasonic/status2') {
-    lastStatus2 = msg;
-    if (msg === 'day') {
-      addLog('Cảm biến 2: Thùng vô cơ ĐẦY', 'red');
-      updateBin(2, parseFloat(document.getElementById('bin2Dist').textContent) || -1, true);
-    } else {
-      updateBin(2, parseFloat(document.getElementById('bin2Dist').textContent) || -1, false);
-    }
-  }
-}
-
-function updateConnection(connected) {
-  const badge = document.getElementById('connBadge');
-  const dot = document.getElementById('connDot');
-  const text = document.getElementById('connText');
-  badge.className = 'connection-badge ' + (connected ? 'connected' : 'disconnected');
-  text.textContent = connected ? 'MQTT Đã kết nối' : 'Mất kết nối';
-  dot.className = 'dot' + (connected ? ' pulse' : '');
-}
-
-// ── INIT ─────────────────────────────────────────────────────
-initMQTT();
 </script>
 </body>
 </html>
