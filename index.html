@@ -849,6 +849,281 @@ footer{
   transition:opacity 0.3s;
   will-change:transform;
 }
+
+/* ══════════════ LOGIN MODAL ══════════════ */
+#login-modal{
+  position:fixed;inset:0;z-index:10000;
+  background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;transition:opacity 0.3s;
+}
+#login-modal.hidden{display:none;opacity:0}
+
+.login-card{
+  background:#ffffff;border-radius:24px;
+  padding:40px;max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(15,23,42,0.2);
+  text-align:center;animation:login-in 0.4s var(--ease-out);
+}
+@keyframes login-in{from{opacity:0;transform:scale(0.95)translate(0,20px)}to{opacity:1;transform:scale(1)}}
+
+.login-icon{
+  width:80px;height:80px;margin:0 auto 24px;
+  background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+  border-radius:20px;border:2px solid rgba(5,150,105,0.2);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 24px rgba(5,150,105,0.15);
+}
+.login-icon svg{width:40px;height:40px;color:#059669}
+
+.login-title{
+  font-size:24px;font-weight:800;color:#0f172a;
+  margin-bottom:10px;letter-spacing:-0.5px;
+}
+.login-desc{
+  font-size:13px;color:#64748b;margin-bottom:32px;line-height:1.6;
+}
+
+.login-options{
+  display:flex;flex-direction:column;gap:12px;
+}
+.login-btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 20px;border-radius:12px;
+  font-family:var(--f-sans);font-size:13px;font-weight:600;
+  cursor:pointer;border:none;
+  transition:all 0.2s var(--ease-out);
+  letter-spacing:0.02em;
+}
+.login-btn:active{transform:scale(0.96)}
+
+.login-btn.admin{
+  background:linear-gradient(135deg,#059669,#10b981);
+  color:#fff;box-shadow:0 4px 12px rgba(5,150,105,0.3);
+}
+.login-btn.admin:hover{
+  box-shadow:0 6px 20px rgba(5,150,105,0.4);
+  transform:translateY(-2px);
+}
+
+.login-btn.user{
+  background:#f1f5f9;border:1.5px solid #e2e8f0;
+  color:#0f172a;box-shadow:0 1px 3px rgba(15,23,42,0.06);
+}
+.login-btn.user:hover{
+  background:#e8eef5;border-color:#cbd5e1;
+  transform:translateY(-2px);
+}
+
+.login-sep{
+  display:flex;align-items:center;gap:12px;
+  margin:24px 0 20px;font-size:12px;color:#94a3b8;
+}
+.login-sep::before,.login-sep::after{
+  content:'';flex:1;height:1px;background:#e2e8f0;
+}
+
+.login-footer{
+  font-size:11px;color:#94a3b8;margin-top:20px;font-family:var(--f-mono);
+  letter-spacing:0.05em;
+}
+
+/* ══════════════ ADMIN PANEL ══════════════ */
+#admin-panel{
+  position:fixed;top:0;right:0;bottom:0;
+  width:380px;background:#ffffff;
+  border-left:1px solid #e2e8f0;
+  box-shadow:-4px 0 16px rgba(15,23,42,0.1);
+  z-index:99;overflow-y:auto;
+  transform:translateX(100%);transition:transform 0.3s var(--ease-out);
+}
+#admin-panel.visible{transform:translateX(0)}
+
+.admin-header{
+  padding:20px;border-bottom:1px solid #e2e8f0;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:#ffffff;z-index:10;
+}
+.admin-title{font-size:14px;font-weight:700;color:#0f172a}
+.admin-close{
+  width:32px;height:32px;border:none;background:#f1f5f9;
+  border-radius:8px;cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s;
+}
+.admin-close:hover{background:#e2e8f0;color:#059669}
+
+.admin-section{padding:16px 20px;border-bottom:1px solid #f1f5f9}
+.admin-section-title{
+  font-size:11px;font-weight:700;
+  color:#94a3b8;letter-spacing:0.1em;
+  text-transform:uppercase;margin-bottom:10px;
+}
+.admin-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px;margin-bottom:6px;
+  background:#f8fafc;border-radius:8px;
+  font-size:12px;color:#0f172a;
+}
+.admin-item-label{font-weight:500;flex:1}
+.admin-item-value{
+  font-family:var(--f-mono);font-size:11px;
+  color:#059669;font-weight:600;
+}
+.admin-btn-group{
+  display:flex;gap:8px;padding:16px 20px;
+}
+.admin-btn{
+  flex:1;padding:9px 12px;border-radius:8px;
+  font-size:12px;font-weight:600;border:none;
+  cursor:pointer;transition:all 0.2s;
+}
+.admin-btn-logout{
+  background:#fef2f2;color:#7f1d1d;border:1px solid rgba(220,38,38,0.2);
+}
+.admin-btn-logout:hover{
+  background:#fee2e2;border-color:rgba(220,38,38,0.3);
+}
+
+/* ══════════════ HEADER BADGE ADMIN ══════════════ */
+.admin-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px;background:linear-gradient(135deg,#fef2f2,#fee2e2);
+  border:1px solid rgba(220,38,38,0.2);color:#b91c1c;
+  border-radius:6px;font-family:var(--f-mono);font-size:9px;
+  font-weight:600;letter-spacing:0.05em;position:absolute;top:12px;right:100px;
+}
+
+.admin-toggle-btn{
+  position:fixed;top:16px;right:24px;z-index:98;
+  width:40px;height:40px;border-radius:50%;
+  background:linear-gradient(135deg,#059669,#10b981);
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;box-shadow:0 4px 12px rgba(5,150,105,0.3);
+  transition:all 0.3s;
+}
+.admin-toggle-btn:hover{
+  box-shadow:0 6px 20px rgba(5,150,105,0.4);
+  transform:scale(1.08);
+}
+
+/* ══════════════ ADMIN LOGIN BTN ══════════════ */
+.admin-login-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:8px;border:1.5px solid #e2e8f0;
+  background:#f8fafc;color:#0f172a;
+  font-family:var(--f-sans);font-size:11px;font-weight:600;
+  letter-spacing:0.05em;cursor:pointer;
+  transition:all 0.2s var(--ease-out);
+}
+.admin-login-btn:hover{
+  border-color:#059669;background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+  color:#059669;
+}
+.admin-login-btn:active{transform:scale(0.96)}
+.admin-login-btn.hidden{display:none}
+
+/* ══════════════ HIDDEN FOR USER ══════════════ */
+.admin-only{display:none}
+.admin-only.show{display:block}
+.admin-only.show-flex{display:flex}
+.admin-only.show-inline-flex{display:inline-flex}
+.admin-only.show-inline{display:inline}
+
+/* ══════════════ PASSWORD MODAL ══════════════ */
+#password-modal{
+  position:fixed;inset:0;z-index:10001;
+  background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+#password-modal.hidden{display:none}
+
+.password-card{
+  background:#ffffff;border-radius:20px;
+  padding:36px;max-width:400px;width:100%;
+  box-shadow:0 25px 60px rgba(15,23,42,0.25);
+  animation:pwd-in 0.4s var(--ease-out);
+}
+@keyframes pwd-in{from{opacity:0;transform:scale(0.92)translateY(20px)}to{opacity:1;transform:scale(1)}}
+
+.password-icon{
+  width:72px;height:72px;margin:0 auto 20px;
+  background:linear-gradient(135deg,#fef2f2,#fee2e2);
+  border-radius:18px;border:2px solid rgba(220,38,38,0.2);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 24px rgba(220,38,38,0.12);
+}
+.password-icon svg{width:36px;height:36px;color:#dc2626}
+
+.password-title{
+  font-size:22px;font-weight:800;color:#0f172a;
+  margin-bottom:8px;letter-spacing:-0.5px;text-align:center;
+}
+.password-desc{
+  font-size:13px;color:#64748b;margin-bottom:24px;
+  text-align:center;line-height:1.5;
+}
+
+.password-input-wrap{
+  margin-bottom:16px;
+}
+.password-input-label{
+  font-size:11px;font-weight:600;
+  color:#475569;letter-spacing:0.05em;
+  text-transform:uppercase;margin-bottom:6px;display:block;
+}
+.password-input{
+  width:100%;padding:11px 14px;
+  border:1.5px solid #e2e8f0;border-radius:10px;
+  font-family:var(--f-mono);font-size:14px;
+  color:#0f172a;background:#f8fafc;
+  transition:all 0.2s;
+}
+.password-input:focus{
+  outline:none;border-color:#059669;
+  background:#fff;box-shadow:0 0 0 3px rgba(5,150,105,0.08);
+}
+.password-input::placeholder{color:#cbd5e1}
+
+.password-btns{
+  display:flex;gap:10px;
+}
+.password-btn{
+  flex:1;padding:11px 16px;border-radius:10px;
+  font-family:var(--f-sans);font-size:12.5px;font-weight:600;
+  cursor:pointer;border:none;
+  transition:all 0.2s var(--ease-out);
+  letter-spacing:0.01em;
+}
+.password-btn:active{transform:scale(0.96)}
+
+.password-btn-submit{
+  background:linear-gradient(135deg,#059669,#10b981);
+  color:#fff;box-shadow:0 4px 12px rgba(5,150,105,0.3);
+}
+.password-btn-submit:hover{
+  box-shadow:0 6px 20px rgba(5,150,105,0.35);
+  transform:translateY(-2px);
+}
+
+.password-btn-cancel{
+  background:#f1f5f9;border:1.5px solid #e2e8f0;
+  color:#475569;box-shadow:0 1px 3px rgba(15,23,42,0.06);
+}
+.password-btn-cancel:hover{
+  background:#e8eef5;border-color:#cbd5e1;
+  transform:translateY(-2px);
+}
+
+.password-error{
+  padding:10px 12px;border-radius:8px;
+  background:#fef2f2;border:1px solid rgba(220,38,38,0.2);
+  color:#b91c1c;font-size:12px;font-weight:500;
+  margin-bottom:16px;display:none;text-align:center;
+}
+.password-error.show{display:block}
 </style>
 </head>
 <body>
@@ -862,6 +1137,71 @@ footer{
 
 <!-- Cursor glow -->
 <div id="cursor-glow" aria-hidden="true"></div>
+
+<!-- ══════ PASSWORD MODAL ══════ -->
+<div id="password-modal" class="hidden" role="dialog" aria-labelledby="pwd-title">
+  <div class="password-card">
+    <div class="password-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <h2 class="password-title" id="pwd-title">Xác minh truy cập</h2>
+    <p class="password-desc">Nhập mật khẩu để truy cập hệ thống giám sát thùng rác</p>
+    
+    <div class="password-error" id="password-error">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;display:inline;margin-right:6px;vertical-align:middle">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span id="password-error-msg">Mật khẩu không đúng</span>
+    </div>
+
+    <form id="password-form" onsubmit="submitPassword(event)">
+      <div class="password-input-wrap">
+        <label class="password-input-label" for="password-input">Mật khẩu</label>
+        <input type="password" id="password-input" class="password-input" 
+          placeholder="Nhập mật khẩu..." autocomplete="off" autofocus required>
+      </div>
+      <div class="password-btns">
+        <button type="button" class="password-btn password-btn-cancel" onclick="cancelPassword()">
+          Hủy
+        </button>
+        <button type="submit" class="password-btn password-btn-submit">
+          Tiếp tục
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ══════ LOGIN MODAL ══════ -->
+<div id="login-modal" class="hidden" role="dialog">
+  <div class="login-card">
+    <div class="login-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <h2 class="login-title">Smart Bin System</h2>
+    <p class="login-desc">Chọn loại tài khoản để truy cập hệ thống giám sát thùng rác</p>
+    <div class="login-options">
+      <button class="login-btn admin" onclick="loginAs('admin')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5m-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11m3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+        </svg>
+        Đăng nhập Admin
+      </button>
+      <button class="login-btn user" onclick="loginAs('user')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        Xem như User
+      </button>
+    </div>
+    <div class="login-footer">Phiên bản 1.0 · IUH Smart Waste</div>
+  </div>
+</div>
 
 <!-- ══════ LOADER ══════ -->
 <div id="loader" role="status" aria-label="Đang tải hệ thống">
@@ -926,6 +1266,13 @@ footer{
       <div class="mqtt-dot" id="mqtt-dot"></div>
       <span id="mqtt-label">Đang kết nối...</span>
     </div>
+
+    <button class="admin-login-btn" id="admin-login-btn" onclick="adminLoginClick()" title="Đăng nhập Admin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7M16 11h6M19 8v6M19 11h6"/>
+      </svg>
+      ADMIN LOGIN
+    </button>
   </div>
 </header>
 
@@ -950,14 +1297,14 @@ footer{
           <span class="htag htag-danger"><span class="htag-dot"></span>Nguy hiểm ≥ 75%</span>
         </div>
         <div class="hero-btns">
-          <button class="btn btn-danger rpl-host" id="btn-alarm-on" onclick="sendAudioCommand(1)">
+          <button class="btn btn-danger rpl-host admin-only" id="btn-alarm-on" onclick="sendAudioCommand(1)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
             Bật cảnh báo
           </button>
-          <button class="btn btn-ghost rpl-host" id="btn-alarm-off" onclick="sendAudioCommand(0)">
+          <button class="btn btn-ghost rpl-host admin-only" id="btn-alarm-off" onclick="sendAudioCommand(0)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <line x1="1" y1="1" x2="23" y2="23"/>
               <path d="M9.9 4.24A6 6 0 0 1 18 8c0 4.01-.81 5.95-1.6 7.1M6.53 6.53C6.19 7.24 6 8.09 6 8c0 7-3 9-3 9h14.34M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -1079,7 +1426,7 @@ footer{
           <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
         </div>
         <div><span class="status-chip chip-load" id="status-1"><span class="chip-dot"></span>Đang tải...</span></div>
-        <button class="open-btn rpl-host" id="open-btn-1" onclick="openBinBtn(this,0)">
+        <button class="open-btn rpl-host admin-only" id="open-btn-1" onclick="openBinBtn(this,0)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
           </svg>
@@ -1128,7 +1475,7 @@ footer{
           <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
         </div>
         <div><span class="status-chip chip-load" id="status-2"><span class="chip-dot"></span>Đang tải...</span></div>
-        <button class="open-btn rpl-host" id="open-btn-2" onclick="openBinBtn(this,1)">
+        <button class="open-btn rpl-host admin-only" id="open-btn-2" onclick="openBinBtn(this,1)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
           </svg>
@@ -1177,7 +1524,7 @@ footer{
           <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
         </div>
         <div><span class="status-chip chip-load" id="status-3"><span class="chip-dot"></span>Đang tải...</span></div>
-        <button class="open-btn rpl-host" id="open-btn-3" onclick="openBinBtn(this,2)">
+        <button class="open-btn rpl-host admin-only" id="open-btn-3" onclick="openBinBtn(this,2)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
           </svg>
@@ -1226,7 +1573,7 @@ footer{
           <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
         </div>
         <div><span class="status-chip chip-load" id="status-4"><span class="chip-dot"></span>Đang tải...</span></div>
-        <button class="open-btn rpl-host" id="open-btn-4" onclick="openBinBtn(this,3)">
+        <button class="open-btn rpl-host admin-only" id="open-btn-4" onclick="openBinBtn(this,3)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <polyline points="7 11 12 6 17 11"/><line x1="12" y1="6" x2="12" y2="18"/>
           </svg>
@@ -1248,6 +1595,81 @@ footer{
   </div>
 </footer>
 
+<!-- ══════ ADMIN PANEL ══════ -->
+<div id="admin-panel">
+  <div class="admin-header">
+    <div class="admin-title">⚙️ Admin Panel</div>
+    <button class="admin-close" onclick="toggleAdminPanel()" title="Đóng">✕</button>
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-section-title">Thông tin tài khoản</div>
+    <div class="admin-item">
+      <span class="admin-item-label">Loại tài khoản</span>
+      <span class="admin-item-value" id="admin-role">ADMIN</span>
+    </div>
+    <div class="admin-item">
+      <span class="admin-item-label">Trạng thái</span>
+      <span class="admin-item-value" id="admin-status" style="color:#10b981">Đã đăng nhập</span>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-section-title">Điều khiển thủ công</div>
+    <div style="padding:0 0 10px 0">
+      <button class="btn btn-danger rpl-host" style="width:100%;margin-bottom:8px" onclick="sendAudioCommand(1)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:13px;height:13px">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        Bật cảnh báo toàn bộ
+      </button>
+      <button class="btn btn-ghost rpl-host" style="width:100%" onclick="sendAudioCommand(0)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:13px;height:13px">
+          <line x1="1" y1="1" x2="23" y2="23"/><path d="M9.9 4.24A6 6 0 0 1 18 8c0 4.01-.81 5.95-1.6 7.1M6.53 6.53C6.19 7.24 6 8.09 6 8c0 7-3 9-3 9h14.34M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        Tắt cảnh báo
+      </button>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-section-title">Mở thùng rác</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 0">
+      <button class="btn btn-ghost rpl-host" style="font-size:11px" onclick="openBin(0)">Thùng 1</button>
+      <button class="btn btn-ghost rpl-host" style="font-size:11px" onclick="openBin(1)">Thùng 2</button>
+      <button class="btn btn-ghost rpl-host" style="font-size:11px" onclick="openBin(2)">Thùng 3</button>
+      <button class="btn btn-ghost rpl-host" style="font-size:11px" onclick="openBin(3)">Thùng 4</button>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-section-title">Thống kê hệ thống</div>
+    <div class="admin-item">
+      <span class="admin-item-label">Thùng online</span>
+      <span class="admin-item-value" id="admin-online">4</span>
+    </div>
+    <div class="admin-item">
+      <span class="admin-item-label">Thùng offline</span>
+      <span class="admin-item-value" id="admin-offline" style="color:#ef4444">0</span>
+    </div>
+    <div class="admin-item">
+      <span class="admin-item-label">Cảnh báo</span>
+      <span class="admin-item-value" id="admin-alert" style="color:#d97706">0</span>
+    </div>
+  </div>
+
+  <div class="admin-btn-group">
+    <button class="admin-btn admin-btn-logout" onclick="logout()">Đăng xuất</button>
+  </div>
+</div>
+
+<!-- ══════ ADMIN TOGGLE BTN ══════ -->
+<button class="admin-toggle-btn admin-only show-inline-flex" id="admin-toggle" onclick="toggleAdminPanel()" title="Admin Panel">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
+    <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+  </svg>
+</button>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 <script>
 /* ══════════ CONFIG ══════════ */
@@ -1265,6 +1687,94 @@ let mqttClient = null, MsgClass = null;
 const lastSeen    = {1:null,2:null,3:null,4:null};
 const offlineFlag = {1:false,2:false,3:false,4:false};
 const fillData    = {1:0,2:0,3:0,4:0};
+
+/* ══════════ USER ROLE MANAGEMENT ══════════ */
+let currentUserRole = localStorage.getItem('userRole') || 'user';
+
+/* Auto-set user role and hide login modal */
+if(currentUserRole === 'user'){
+  localStorage.setItem('userRole', 'user');
+}
+const loginModal = document.getElementById('login-modal');
+if(loginModal) loginModal.classList.add('hidden');
+
+async function loginAs(role){
+  /* If User role, login directly without password */
+  if(role === 'user'){
+    currentUserRole = 'user';
+    localStorage.setItem('userRole', 'user');
+    document.getElementById('login-modal').classList.add('hidden');
+    setTimeout(()=>{ applyRolePermissions(); }, 200);
+    return;
+  }
+  
+  /* If Admin role, show password modal first */
+  if(role === 'admin'){
+    const passwordValid = await showPasswordModal();
+    if(passwordValid){
+      currentUserRole = 'admin';
+      localStorage.setItem('userRole', 'admin');
+      document.getElementById('login-modal').classList.add('hidden');
+      setTimeout(()=>{ applyRolePermissions(); }, 200);
+    }
+    /* If password is wrong, stay on login modal */
+    return;
+  }
+}
+
+function logout(){
+  currentUserRole = null;
+  localStorage.removeItem('userRole');
+  document.getElementById('admin-panel').classList.remove('visible');
+  location.reload();
+}
+
+function adminLoginClick(){
+  loginAs('admin');
+}
+
+function applyRolePermissions(){
+  const adminElements = document.querySelectorAll('.admin-only');
+  const adminLoginBtn = document.getElementById('admin-login-btn');
+  
+  if(currentUserRole === 'admin'){
+    adminElements.forEach(el=>{
+      /* Determine which display type to use based on existing classes */
+      const displayClass = 
+        el.classList.contains('show-inline-flex') ? 'show-inline-flex' :
+        el.classList.contains('show-flex') ? 'show-flex' :
+        el.classList.contains('show-inline') ? 'show-inline' : 'show';
+      el.classList.add(displayClass);
+    });
+    /* Hide admin login button for admin */
+    if(adminLoginBtn) adminLoginBtn.classList.add('hidden');
+  } else if(currentUserRole === 'user'){
+    adminElements.forEach(el=>{
+      el.classList.remove('show','show-flex','show-inline-flex','show-inline');
+    });
+    /* Show admin login button for user */
+    if(adminLoginBtn) adminLoginBtn.classList.remove('hidden');
+  }
+}
+
+function toggleAdminPanel(){
+  const panel = document.getElementById('admin-panel');
+  panel.classList.toggle('visible');
+}
+
+function updateAdminStats(){
+  const online = [1,2,3,4].filter(i=>!offlineFlag[i]).length;
+  const offline = [1,2,3,4].filter(i=>offlineFlag[i]).length;
+  const alerts = [1,2,3,4].filter(i=>offlineFlag[i]||fillData[i]>=DANGER_PCT).length;
+  
+  const elOnline = document.getElementById('admin-online');
+  const elOffline = document.getElementById('admin-offline');
+  const elAlert = document.getElementById('admin-alert');
+  
+  if(elOnline) elOnline.textContent = online;
+  if(elOffline) elOffline.textContent = offline;
+  if(elAlert) elAlert.textContent = alerts;
+}
 
 /* ══════════ CURSOR GLOW ══════════ */
 const cursorGlow = document.getElementById('cursor-glow');
@@ -1291,17 +1801,11 @@ const pctInterval = setInterval(()=>{
 }, 180);
 
 window.addEventListener('load', () => {
-  if(!requestPassword()){
-    const loader = document.getElementById('loader');
-    if(loader) loader.style.display = 'none';
-    document.body.innerHTML = `
-      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f8fafc;font-family:Inter,system-ui,sans-serif;color:#0f172a;text-align:center;">
-        <div>
-          <h1 style="font-size:28px;margin-bottom:12px;">Truy cập bị từ chối</h1>
-          <p style="font-size:16px;color:#475569;">Bạn đã nhập mật khẩu sai hoặc hủy. Tải lại trang và thử lại.</p>
-        </div>
-      </div>`;
-    return;
+  /* Auto-set as user if not logged in */
+  if(!currentUserRole){
+    currentUserRole = 'user';
+    localStorage.setItem('userRole', 'user');
+    document.getElementById('login-modal').classList.add('hidden');
   }
 
   setTimeout(()=>{
@@ -1311,7 +1815,13 @@ window.addEventListener('load', () => {
       const loader = document.getElementById('loader');
       loader.classList.add('fade-out');
       setTimeout(()=>{ loader.style.display='none'; },600);
-      setTimeout(()=>{ initMQTT(); startAllOfflineWatchers(); updateStats(); },400);
+      setTimeout(()=>{ 
+        applyRolePermissions();
+        initMQTT(); 
+        startAllOfflineWatchers(); 
+        updateStats();
+        updateAdminStats();
+      },400);
     },300);
   }, 2200);
 });
@@ -1480,6 +1990,7 @@ function updateStats(){
   document.getElementById('stat-online').textContent = online.length;
   document.getElementById('stat-alert').textContent  = alerts.length;
   document.getElementById('stat-avg').textContent    = avg;
+  updateAdminStats();
 }
 
 /* ══════════ LAST UPDATE ══════════ */
@@ -1493,12 +2004,40 @@ function updateTimestamp(){
 const TOAST_THR = {};
 const PAGE_PASSWORD = "1234"; // Thay đổi mật khẩu nếu cần
 
-function requestPassword(){
-  const input = prompt("Nhập mật khẩu truy cập trang:");
-  if(input === null) return false;
-  if(input === PAGE_PASSWORD) return true;
-  alert("Mật khẩu không đúng. Vui lòng thử lại.");
-  return requestPassword();
+/* ══════════ PASSWORD MODAL HANDLERS ══════════ */
+let passwordModalResolve = null;
+
+function showPasswordModal(){
+  return new Promise((resolve)=>{
+    passwordModalResolve = resolve;
+    document.getElementById('password-modal').classList.remove('hidden');
+    document.getElementById('password-input').value = '';
+    document.getElementById('password-error').classList.remove('show');
+    document.getElementById('password-input').focus();
+  });
+}
+
+function submitPassword(event){
+  event.preventDefault();
+  const input = document.getElementById('password-input').value;
+  const errorEl = document.getElementById('password-error');
+  
+  if(input === PAGE_PASSWORD){
+    document.getElementById('password-modal').classList.add('hidden');
+    if(passwordModalResolve) passwordModalResolve(true);
+  } else {
+    errorEl.classList.add('show');
+    document.getElementById('password-input').select();
+    setTimeout(()=>{ 
+      errorEl.classList.remove('show');
+      document.getElementById('password-input').focus();
+    }, 3000);
+  }
+}
+
+function cancelPassword(){
+  document.getElementById('password-modal').classList.add('hidden');
+  if(passwordModalResolve) passwordModalResolve(false);
 }
 
 function onDistance(id, dist){
@@ -1555,6 +2094,7 @@ function onDistance(id, dist){
   }
 
   updateStats();
+  updateAdminStats();
 }
 
 /* ══════════ STATUS ══════════ */
@@ -1582,6 +2122,7 @@ function startAllOfflineWatchers(){
       document.getElementById(`offline-${id}`).classList.add('show');
       document.getElementById(`card-${id}`).classList.add('offline');
       updateStats();
+      updateAdminStats();
     }, OFFLINE_MS);
   });
 }
