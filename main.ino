@@ -1,240 +1,432 @@
-//servo 2 là vô cơ
-
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ESP32Servo.h>
+#include <HardwareSerial.h>
+#include <JQ6500_Serial.h>
+#include <TinyGPS++.h>
 
+// ============================================================
+// --- Cấu hình WiFi ---
+// ============================================================
 const char* ssid = "677 5G";
 const char* password = "10101010";
 
+// ============================================================
+// --- Cấu hình MQTT ---
+// ============================================================
 const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
-const char* topic_sub     = "esp32/servo/control";
-const char* topic_sensor1 = "esp32/ultrasonic/sensor1";
-const char* topic_sensor2 = "esp32/ultrasonic/sensor2";
-const char* topic_status1 = "esp32/ultrasonic/status1";
-const char* topic_status2 = "esp32/ultrasonic/status2";
-const char* topic_buzzer  = "esp32/buzzer/control";   
 
-const float DISTANCE_THRESHOLD = 15.0f;
+const char* topic_sub_servo  = "esp32/servo/control";
+const char* topic_sub_audio  = "esp32/audio/control";
 
-const int BUZZER_PIN = 26;
+const char* topic_pub_dist1   = "esp32/bin1/distance";
+const char* topic_pub_dist2   = "esp32/bin2/distance";
+const char* topic_pub_status1 = "esp32/bin1/status";
+const char* topic_pub_status2 = "esp32/bin2/status";
 
-const unsigned long BEEP_ON  = 200;
-const unsigned long BEEP_OFF = 200;
+// Cảm biến tiệm cận hồng ngoại
+const char* topic_pub_ir1     = "esp32/ir1/status";
+const char* topic_pub_ir2     = "esp32/ir2/status";
 
-bool buzzerActive       = false;
-bool buzzerState        = false;
-unsigned long buzzerLast = 0;
-bool buzzerMuted        = false;   
+// GPS
+const char* topic_pub_gps_lat = "esp32/gps/latitude";
+const char* topic_pub_gps_lng = "esp32/gps/longitude";
+const char* topic_pub_gps_spd = "esp32/gps/speed";
+const char* topic_pub_gps_alt = "esp32/gps/altitude";
+const char* topic_pub_gps_sat = "esp32/gps/satellites";
 
-WiFiClient espClient;
+WiFiClient   espClient;
 PubSubClient client(espClient);
 
+// ============================================================
+// --- Cấu hình Servo ---
+// ============================================================
 Servo servo1;
 Servo servo2;
 
-const int servo1Pin = 19;
-const int servo2Pin = 25;
+const int servo1Pin = 22;
+const int servo2Pin = 15;
 
-bool servo1Busy = false;
-bool servo2Busy = false;
+// ============================================================
+// --- Cảm biến siêu âm (HC-SR04/05) ---
+// ============================================================
+const int trig1Pin = 5;
+const int echo1Pin = 18;
+const int trig2Pin = 19;
+const int echo2Pin = 21;
 
-unsigned long servo1Start = 0;
-unsigned long servo2Start = 0;
+// ============================================================
+// --- Cảm biến tiệm cận hồng ngoại ---
+// Chân OUTPUT của module IR nối vào 2 chân này.
+// Mức LOW = có vật, mức HIGH = không có vật (thường gặp với
+// module FC-51 / TCRT5000). Điều chỉnh logic nếu module của
+// bạn ngược lại.
+// ============================================================
+const int ir1Pin = 34;   // GPIO34 – input only, phù hợp cảm biến
+const int ir2Pin = 35;   // GPIO35 – input only
 
-const int TRIG1 = 5;
-const int ECHO1 = 18;
-const int TRIG2 = 22;
-const int ECHO2 = 23;
+// ============================================================
+// --- Cấu hình JQ6500 – chuyển sang Serial1 (chân 4, 2) ---
+// TX ESP32 → RX JQ6500 : GPIO4
+// RX ESP32 ← TX JQ6500 : GPIO2  (thường không cần)
+// ============================================================
+HardwareSerial jqSerial(1);          // UART1
+JQ6500_Serial  mp3(jqSerial);
 
-const unsigned long SENSOR_INTERVAL = 500;
-unsigned long lastSensorRead = 0;
+// ============================================================
+// --- Cấu hình GPS (NEO-7M) – giữ Serial2 (chân 16, 17) ---
+// ============================================================
+TinyGPSPlus    gps;
+HardwareSerial GPSserial(2);         // UART2
 
-float measureDistance(int trigPin, int echoPin) {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+const int GPS_RX = 16;
+const int GPS_TX = 17;
+const uint32_t GPS_BAUD = 9600;
 
-  long duration = pulseIn(echoPin, HIGH, 30000);
-  if (duration == 0) return -1;
+// ============================================================
+// --- Biến trạng thái ---
+// ============================================================
+bool isBin1Full     = false;
+bool isBin2Full     = false;
+bool isAudioEnabled = true;
 
-  float distance = duration * 0.0343f / 2.0f;
-  if (distance < 2.0f || distance > 400.0f) return -1;
+int  action = -1;
 
-  return distance;
+// IR trạng thái trước (tránh publish liên tục)
+bool lastIR1State = false;
+bool lastIR2State = false;
+
+// ============================================================
+// --- Timing ---
+// ============================================================
+unsigned long lastServo1Time      = 0;
+unsigned long lastServo2Time      = 0;
+unsigned long lastMovementTime    = 0;
+unsigned long lastSensorCheckTime = 0;
+unsigned long lastReconnectAttempt= 0;
+unsigned long lastAlert1Time      = 0;
+unsigned long lastAlert2Time      = 0;
+unsigned long lastGPSPublishTime  = 0;
+
+const unsigned long cooldownPeriod   = 5000;
+const unsigned long waitBeforeMeasure= 3000;
+const unsigned long alertInterval    = 10000;
+const unsigned long gpsPublishInterval = 5000;  // Publish GPS mỗi 5 giây
+
+// ============================================================
+// --- Hàm tiện ích ---
+// ============================================================
+
+// Delay không làm rớt MQTT
+void smartDelay(unsigned long ms) {
+  unsigned long start = millis();
+  while (millis() - start < ms) {
+    // Đọc GPS trong lúc chờ
+    while (GPSserial.available() > 0)
+      gps.encode(GPSserial.read());
+
+    if (client.connected())
+      client.loop();
+
+    delay(10);
+  }
 }
 
-void handleBuzzer() {
-  if (!buzzerActive) {
-    digitalWrite(BUZZER_PIN, LOW);
-    return;
-  }
-
-  unsigned long now = millis();
-  unsigned long interval = buzzerState ? BEEP_ON : BEEP_OFF;
-
-  if (now - buzzerLast >= interval) {
-    buzzerState = !buzzerState;
-    digitalWrite(BUZZER_PIN, buzzerState ? HIGH : LOW);
-    buzzerLast = now;
-  }
-}
-
-void publishSensors() {
-  char buf[16];
-  bool full1 = false;
-  bool full2 = false;
-
-  float d1 = measureDistance(TRIG1, ECHO1);
-  if (d1 >= 0) {
-    dtostrf(d1, 5, 1, buf);
-    client.publish(topic_sensor1, buf);
-    if (d1 < DISTANCE_THRESHOLD) {
-      client.publish(topic_status1, "day");
-      full1 = true;
-    } else {
-      client.publish(topic_status1, "khong day");
-    }
-  } else {
-    client.publish(topic_sensor1, "-1");
-    client.publish(topic_status1, "khong day");
-  }
-
+void setup_wifi() {
   delay(10);
-
-  float d2 = measureDistance(TRIG2, ECHO2);
-  if (d2 >= 0) {
-    dtostrf(d2, 5, 1, buf);
-    client.publish(topic_sensor2, buf);
-    if (d2 < DISTANCE_THRESHOLD) {
-      client.publish(topic_status2, "day");
-      full2 = true;
-    } else {
-      client.publish(topic_status2, "khong day");
-    }
-  } else {
-    client.publish(topic_sensor2, "-1");
-    client.publish(topic_status2, "khong day");
-  }
-
-  if (full1 || full2) {
-    // NEW: chỉ bật còi nếu chưa bị mute và còi chưa đang kêu
-    if (!buzzerMuted && !buzzerActive) {
-      buzzerActive = true;
-      buzzerState  = true;
-      buzzerLast   = millis();
-      digitalWrite(BUZZER_PIN, HIGH);
-    }
-  } else {
-    // Thùng đã được dọn → reset mute để lần đầy tiếp theo còi kêu lại bình thường
-    buzzerActive = false;
-    buzzerState  = false;
-    buzzerMuted  = false;   // NEW
-    digitalWrite(BUZZER_PIN, LOW);
-  }
-}
-
-void setupWiFi() {
+  Serial.println();
+  Serial.print("Đang kết nối WiFi: ");
+  Serial.println(ssid);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
+    Serial.print(".");
   }
+  Serial.println("\nWiFi đã kết nối thành công!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
 }
 
-void reconnect() {
-  while (!client.connected()) {
-    String clientId = "ESP32Servo-";
-    clientId += String(random(0xffff), HEX);
-
-    if (client.connect(clientId.c_str())) {
-      client.subscribe(topic_sub);
-      client.subscribe(topic_buzzer);   // NEW: subscribe topic tắt còi
-    } else {
-      delay(2000);
-    }
-  }
-}
-
+// ============================================================
+// --- MQTT Callback ---
+// ============================================================
 void callback(char* topic, byte* payload, unsigned int length) {
-  String msg;
-  for (unsigned int i = 0; i < length; i++) {
+  String msg = "";
+  for (unsigned int i = 0; i < length; i++)
     msg += (char)payload[i];
+
+  Serial.print("Nhận MQTT [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  Serial.println(msg);
+
+  // Điều khiển Servo
+  if (strcmp(topic, topic_sub_servo) == 0) {
+    if (msg == "0") {
+      if (lastServo1Time == 0 || millis() - lastServo1Time >= cooldownPeriod)
+        action = 0;
+      else
+        Serial.println("-> Bỏ qua: Servo 1 đang cooldown!");
+    }
+    else if (msg == "1") {
+      if (lastServo2Time == 0 || millis() - lastServo2Time >= cooldownPeriod)
+        action = 1;
+      else
+        Serial.println("-> Bỏ qua: Servo 2 đang cooldown!");
+    }
   }
 
-  // ── Điều khiển servo ──────────────────────────────────────
-  if (strcmp(topic, topic_sub) == 0) {
-    if (msg == "1" && !servo1Busy) {
-      servo1.write(90);
-      servo1Start = millis();
-      servo1Busy = true;
-      lastSensorRead = millis();
+  // Bật/Tắt âm thanh
+  else if (strcmp(topic, topic_sub_audio) == 0) {
+    if (msg == "0") {
+      isAudioEnabled = false;
+      Serial.println("-> Đã TẮT âm thanh cảnh báo.");
     }
-    if (msg == "0" && !servo2Busy) {
-      servo2.write(90);
-      servo2Start = millis();
-      servo2Busy = true;
-      lastSensorRead = millis();
-    }
-  }
-
-  // ── Tắt còi (NEW) ────────────────────────────────────────
-  // Gửi "off" đến esp32/buzzer/control để tắt còi đang kêu.
-  // Còi sẽ tự kêu lại khi thùng được dọn rồi đầy trở lại.
-  if (strcmp(topic, topic_buzzer) == 0) {
-    if (msg == "off" && buzzerActive) {
-      buzzerActive = false;
-      buzzerState  = false;
-      buzzerMuted  = true;          // đánh dấu đã mute thủ công
-      digitalWrite(BUZZER_PIN, LOW);
+    else if (msg == "1") {
+      isAudioEnabled = true;
+      Serial.println("-> Đã BẬT âm thanh cảnh báo.");
     }
   }
 }
 
+// ============================================================
+// --- Reconnect MQTT ---
+// ============================================================
+void reconnect() {
+  Serial.print("Đang kết nối lại MQTT...");
+  String clientId = "ESP32Client-";
+  clientId += String(random(0xffff), HEX);
+
+  if (client.connect(clientId.c_str())) {
+    Serial.println("Thành công!");
+    client.subscribe(topic_sub_servo);
+    client.subscribe(topic_sub_audio);
+  }
+  else {
+    Serial.print("Thất bại, mã lỗi = ");
+    Serial.println(client.state());
+  }
+}
+
+// ============================================================
+// --- Đo khoảng cách ---
+// ============================================================
+float getDistance(int trig, int echo) {
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+
+  long duration = pulseIn(echo, HIGH, 30000);
+  if (duration == 0) return 999.0;
+  return duration * 0.034 / 2.0;
+}
+
+// ============================================================
+// --- Publish GPS lên MQTT ---
+// ============================================================
+void publishGPS() {
+  if (!gps.location.isValid()) {
+    Serial.println("GPS: Chưa có tín hiệu hợp lệ.");
+    client.publish(topic_pub_gps_lat, "NO_FIX");
+    client.publish(topic_pub_gps_lng, "NO_FIX");
+    return;
+  }
+
+  // Latitude / Longitude (6 chữ số thập phân)
+  char buf[20];
+
+  dtostrf(gps.location.lat(), 10, 6, buf);
+  client.publish(topic_pub_gps_lat, buf);
+
+  dtostrf(gps.location.lng(), 10, 6, buf);
+  client.publish(topic_pub_gps_lng, buf);
+
+  // Tốc độ km/h
+  if (gps.speed.isValid()) {
+    dtostrf(gps.speed.kmph(), 6, 1, buf);
+    client.publish(topic_pub_gps_spd, buf);
+  }
+
+  // Độ cao (m)
+  if (gps.altitude.isValid()) {
+    dtostrf(gps.altitude.meters(), 7, 1, buf);
+    client.publish(topic_pub_gps_alt, buf);
+  }
+
+  // Số vệ tinh
+  if (gps.satellites.isValid()) {
+    client.publish(topic_pub_gps_sat,
+                   String(gps.satellites.value()).c_str());
+  }
+
+  Serial.printf("GPS → Lat: %.6f | Lng: %.6f | Spd: %.1f km/h | Alt: %.1f m | Sat: %d\n",
+                gps.location.lat(),
+                gps.location.lng(),
+                gps.speed.isValid()     ? gps.speed.kmph()       : 0.0,
+                gps.altitude.isValid()  ? gps.altitude.meters()  : 0.0,
+                gps.satellites.isValid()? gps.satellites.value() : 0);
+}
+
+// ============================================================
+// --- SETUP ---
+// ============================================================
 void setup() {
-  servo1.setPeriodHertz(50);
-  servo2.setPeriodHertz(50);
-  servo1.attach(servo1Pin, 500, 2400);
-  servo2.attach(servo2Pin, 500, 2400);
+  Serial.begin(115200);
+
+  // Siêu âm
+  pinMode(trig1Pin, OUTPUT);
+  pinMode(echo1Pin, INPUT);
+  pinMode(trig2Pin, OUTPUT);
+  pinMode(echo2Pin, INPUT);
+
+  // Cảm biến hồng ngoại (INPUT_PULLUP nếu module kéo lên, 
+  // hoặc INPUT nếu module đã có trở kéo trên board)
+  pinMode(ir1Pin, INPUT);
+  pinMode(ir2Pin, INPUT);
+
+  // JQ6500 – UART1, TX=GPIO4, RX=GPIO2
+  jqSerial.begin(9600, SERIAL_8N1, 2, 4);
+  mp3.reset();
+  mp3.setVolume(25);
+  mp3.setSource(MP3_SRC_BUILTIN);
+
+  // GPS – UART2, RX=16, TX=17
+  GPSserial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX, GPS_TX);
+  Serial.println("GPS UART2 khởi động...");
+
+  // Servo
+  servo1.attach(servo1Pin);
+  servo2.attach(servo2Pin);
   servo1.write(0);
   servo2.write(0);
 
-  pinMode(TRIG1, OUTPUT);
-  pinMode(ECHO1, INPUT);
-  pinMode(TRIG2, OUTPUT);
-  pinMode(ECHO2, INPUT);
-
-  pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, LOW);
-
-  setupWiFi();
+  setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 }
 
+// ============================================================
+// --- LOOP ---
+// ============================================================
 void loop() {
+  // --- Đọc GPS liên tục ---
+  while (GPSserial.available() > 0)
+    gps.encode(GPSserial.read());
+
+  // --- Duy trì kết nối MQTT ---
   if (!client.connected()) {
-    reconnect();
+    if (millis() - lastReconnectAttempt > 5000) {
+      lastReconnectAttempt = millis();
+      reconnect();
+    }
   }
-  client.loop();
-
-  if (servo1Busy && millis() - servo1Start >= 3000) {
-    servo1.write(0);
-    servo1Busy = false;
-  }
-  if (servo2Busy && millis() - servo2Start >= 3000) {
-    servo2.write(0);
-    servo2Busy = false;
+  else {
+    client.loop();
   }
 
-  if (!servo1Busy && !servo2Busy) {
-    if (millis() - lastSensorRead >= SENSOR_INTERVAL) {
-      lastSensorRead = millis();
-      publishSensors();
+  // ============================================================
+  // XỬ LÝ SERVO
+  // ============================================================
+  if (action == 0) {
+    Serial.println("-> Mở Servo 1, phát bài 1...");
+    mp3.playFileByIndexNumber(1);
+
+    for (int a = 0; a <= 180; a += 5) { servo1.write(a); smartDelay(50); }
+    smartDelay(5000);
+    for (int a = 180; a >= 0; a -= 5) { servo1.write(a); smartDelay(50); }
+
+    mp3.pause();
+    action          = -1;
+    lastServo1Time  = millis();
+    lastMovementTime= millis();
+  }
+  else if (action == 1) {
+    Serial.println("-> Mở Servo 2, phát bài 2...");
+    mp3.playFileByIndexNumber(2);
+
+    for (int a = 0; a <= 180; a += 5) { servo2.write(a); smartDelay(50); }
+    smartDelay(5000);
+    for (int a = 180; a >= 0; a -= 5) { servo2.write(a); smartDelay(50); }
+
+    mp3.pause();
+    action          = -1;
+    lastServo2Time  = millis();
+    lastMovementTime= millis();
+  }
+
+  // ============================================================
+  // ĐO KHOẢNG CÁCH + KIỂM TRA IR + PUBLISH
+  // ============================================================
+  if (action == -1 && (millis() - lastMovementTime >= waitBeforeMeasure)) {
+    if (millis() - lastSensorCheckTime >= 1000) {
+      lastSensorCheckTime = millis();
+
+      // --- Siêu âm ---
+      float dist1 = getDistance(trig1Pin, echo1Pin);
+      float dist2 = getDistance(trig2Pin, echo2Pin);
+
+      if (dist1 < 999.0) client.publish(topic_pub_dist1, String(dist1, 1).c_str());
+      if (dist2 < 999.0) client.publish(topic_pub_dist2, String(dist2, 1).c_str());
+
+      // Thùng 1
+      if (dist1 > 0 && dist1 < 7.0) {
+        client.publish(topic_pub_status1, "FULL");
+        if (!isBin1Full || millis() - lastAlert1Time >= alertInterval) {
+          Serial.printf("-> Thùng 1 ĐẦY! (%.1f cm)\n", dist1);
+          if (isAudioEnabled) mp3.playFileByIndexNumber(3);
+          isBin1Full    = true;
+          lastAlert1Time= millis();
+        }
+      }
+      else {
+        client.publish(topic_pub_status1, "EMPTY");
+        isBin1Full = false;
+      }
+
+      // Thùng 2
+      if (dist2 > 0 && dist2 < 7.0) {
+        client.publish(topic_pub_status2, "FULL");
+        if (!isBin2Full || millis() - lastAlert2Time >= alertInterval) {
+          Serial.printf("-> Thùng 2 ĐẦY! (%.1f cm)\n", dist2);
+          if (isAudioEnabled) mp3.playFileByIndexNumber(4);
+          isBin2Full    = true;
+          lastAlert2Time= millis();
+        }
+      }
+      else {
+        client.publish(topic_pub_status2, "EMPTY");
+        isBin2Full = false;
+      }
+
+      // --- Cảm biến hồng ngoại ---
+      // Module FC-51/TCRT5000: LOW = phát hiện vật, HIGH = không có vật
+      bool ir1Detected = (digitalRead(ir1Pin) == LOW);
+      bool ir2Detected = (digitalRead(ir2Pin) == LOW);
+
+      // Chỉ publish khi trạng thái thay đổi (giảm traffic MQTT)
+      if (ir1Detected != lastIR1State) {
+        client.publish(topic_pub_ir1, ir1Detected ? "DETECTED" : "CLEAR");
+        Serial.printf("-> IR1: %s\n", ir1Detected ? "DETECTED" : "CLEAR");
+        lastIR1State = ir1Detected;
+      }
+      if (ir2Detected != lastIR2State) {
+        client.publish(topic_pub_ir2, ir2Detected ? "DETECTED" : "CLEAR");
+        Serial.printf("-> IR2: %s\n", ir2Detected ? "DETECTED" : "CLEAR");
+        lastIR2State = ir2Detected;
+      }
     }
   }
 
-  handleBuzzer();
+  // ============================================================
+  // PUBLISH GPS (mỗi 5 giây, độc lập với servo/sensor)
+  // ============================================================
+  if (millis() - lastGPSPublishTime >= gpsPublishInterval) {
+    lastGPSPublishTime = millis();
+    if (client.connected()) {
+      publishGPS();
+    }
+  }
 }
