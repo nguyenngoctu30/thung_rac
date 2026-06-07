@@ -7,6 +7,9 @@
 <meta name="description" content="Hệ thống giám sát thùng rác thông minh IoT – ESP32 + MQTT realtime tại IUH">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Leaflet CSS & JS for OpenStreetMap -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
 /* ══════════════ RESET & ROOT ══════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1124,6 +1127,156 @@ footer{
   margin-bottom:16px;display:none;text-align:center;
 }
 .password-error.show{display:block}
+
+/* ── Status chip stuck ── */
+.status-chip.chip-stuck {
+  background: #fff7ed;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  color: #c2410c;
+}
+.status-chip.chip-stuck .chip-dot {
+  background: #f97316;
+  animation: blink 0.6s ease infinite;
+}
+
+/* ── Bin card stuck state ── */
+.bin-card.stuck {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: linear-gradient(160deg, #fff7ed 0%, #ffffff 40%);
+}
+.bin-card.stuck:hover {
+  --card-glow: var(--c-amber2);
+}
+
+/* ══════════════ MAP PANEL ══════════════ */
+.map-panel {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-2xl);
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 4px 20px rgba(15,23,42,0.04);
+  position: relative;
+  overflow: hidden;
+  animation: slide-up 0.55s var(--ease-out) both;
+}
+.map-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 100% 0%, rgba(37,99,235,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+.map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.map-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.map-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-text2);
+  letter-spacing: -0.2px;
+}
+.map-badge {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  color: var(--c-blue);
+  background: var(--c-blue-bg);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  padding: 2px 9px;
+  border-radius: 99px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.map-status {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--c-text4);
+}
+
+.map-container-layout {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr;
+  gap: 16px;
+}
+@media(max-width: 900px) {
+  .map-container-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.map-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.device-gps-card {
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  transition: all 0.2s var(--ease-out);
+}
+.device-gps-card:hover {
+  background: var(--c-surface);
+  box-shadow: 0 4px 12px rgba(15,23,42,0.05);
+  transform: translateY(-2px);
+}
+.gps-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gps-device-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.gps-device-dot.green {
+  background: var(--c-green2);
+  box-shadow: 0 0 0 2px rgba(16,185,129,0.2);
+}
+.gps-device-dot.blue {
+  background: var(--c-blue2);
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+}
+.gps-device-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text2);
+}
+.gps-coordinates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.gps-coord-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-mono);
+  font-size: 11px;
+}
+.gps-coord-label {
+  color: var(--c-text4);
+}
+.gps-coord-val {
+  color: var(--c-text2);
+  font-weight: 500;
+}
+.gps-card-status {
+  font-size: 10px;
+  color: var(--c-text4);
+  font-style: italic;
+  text-align: right;
+}
 </style>
 </head>
 <body>
@@ -1583,6 +1736,62 @@ footer{
     </div>
 
   </div><!-- /bins-grid -->
+
+  <!-- MAP PANEL -->
+  <div class="map-panel reveal" style="margin-top:24px">
+    <div class="map-header">
+      <div class="map-header-left">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px;color:var(--c-blue)">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span class="map-title">Bản đồ vị trí thiết bị</span>
+        <span class="map-badge">Real-time GPS</span>
+      </div>
+      <span class="map-status" id="map-status">Đang định vị...</span>
+    </div>
+    
+    <div class="map-container-layout">
+      <div id="map" style="height: 400px; border-radius: var(--r-lg); border: 1px solid var(--c-border); z-index: 1;"></div>
+      <div class="map-info-panel">
+        <div class="device-gps-card" id="gps-card-1">
+          <div class="gps-card-header">
+            <div class="gps-device-dot green"></div>
+            <span class="gps-device-name">Thiết bị ESP1 (Thùng 1 & 2)</span>
+          </div>
+          <div class="gps-coordinates">
+            <div class="gps-coord-row">
+              <span class="gps-coord-label">Latitude:</span>
+              <span class="gps-coord-val" id="gps-lat-1">10.822159</span>
+            </div>
+            <div class="gps-coord-row">
+              <span class="gps-coord-label">Longitude:</span>
+              <span class="gps-coord-val" id="gps-lng-1">106.687497</span>
+            </div>
+          </div>
+          <div class="gps-card-status" id="gps-status-1">Tọa độ mặc định (IUH)</div>
+        </div>
+        
+        <div class="device-gps-card" id="gps-card-2">
+          <div class="gps-card-header">
+            <div class="gps-device-dot blue"></div>
+            <span class="gps-device-name">Thiết bị ESP2 (Thùng 3 & 4)</span>
+          </div>
+          <div class="gps-coordinates">
+            <div class="gps-coord-row">
+              <span class="gps-coord-label">Latitude:</span>
+              <span class="gps-coord-val" id="gps-lat-2">10.822300</span>
+            </div>
+            <div class="gps-coord-row">
+              <span class="gps-coord-label">Longitude:</span>
+              <span class="gps-coord-val" id="gps-lng-2">106.687700</span>
+            </div>
+          </div>
+          <div class="gps-card-status" id="gps-status-2">Tọa độ mặc định (IUH)</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 
 <footer>
@@ -1687,6 +1896,24 @@ let mqttClient = null, MsgClass = null;
 const lastSeen    = {1:null,2:null,3:null,4:null};
 const offlineFlag = {1:false,2:false,3:false,4:false};
 const fillData    = {1:0,2:0,3:0,4:0};
+
+/* State variables for Jammed (Kẹt nắp) logic & GPS Map */
+const irStatus   = {1:"CLEAR", 2:"CLEAR", 3:"CLEAR", 4:"CLEAR"};
+const lidOpen    = {1:false, 2:false, 3:false, 4:false};
+const lidTimeout = {1:null, 2:null, 3:null, 4:null};
+const binStatus  = {1:"Đang tải...", 2:"Đang tải...", 3:"Đang tải...", 4:"Đang tải..."};
+
+let map = null;
+let marker1 = null;
+let marker2 = null;
+
+const defaultGPS1 = [10.822159, 106.687497];
+const defaultGPS2 = [10.822300, 106.687700];
+
+const currentGPS = {
+  1: { lat: defaultGPS1[0], lng: defaultGPS1[1], hasFix: false },
+  2: { lat: defaultGPS2[0], lng: defaultGPS2[1], hasFix: false }
+};
 
 /* ══════════ USER ROLE MANAGEMENT ══════════ */
 let currentUserRole = localStorage.getItem('userRole') || 'user';
@@ -1821,6 +2048,7 @@ window.addEventListener('load', () => {
         startAllOfflineWatchers(); 
         updateStats();
         updateAdminStats();
+        initMap();
       },400);
     },300);
   }, 2200);
@@ -1915,10 +2143,45 @@ function initMQTT(){
   };
   mqttClient.onMessageArrived = msg=>{
     const p = msg.destinationName.split('/');
-    if(p.length===3 && p[0]==='esp32' && p[1].startsWith('bin')){
-      const id = p[1].replace('bin','');
-      if(p[2]==='distance') onDistance(id, parseFloat(msg.payloadString));
-      else if(p[2]==='status') onStatus(id, msg.payloadString);
+    const payload = msg.payloadString.trim();
+    
+    if (p.length === 3 && p[0] === 'esp32') {
+      // Handle bin status and distance
+      if (p[1].startsWith('bin')) {
+        const id = parseInt(p[1].replace('bin', ''));
+        if (p[2] === 'distance') {
+          onDistance(id, parseFloat(payload));
+        } else if (p[2] === 'status') {
+          onStatus(id, payload);
+        }
+      }
+      // Handle IR sensor status
+      else if (p[1].startsWith('ir')) {
+        const id = parseInt(p[1].replace('ir', ''));
+        if (p[2] === 'status') {
+          onIRStatus(id, payload);
+        }
+      }
+      // Handle Servo control messages (to update lidOpen state)
+      else if (p[1] === 'servo') {
+        if (p[2] === 'control') {
+          if (payload === '0') triggerLidTimer(1);
+          else if (payload === '1') triggerLidTimer(2);
+        } else if (p[2] === 'control_2') {
+          if (payload === '0') triggerLidTimer(3);
+          else if (payload === '1') triggerLidTimer(4);
+        }
+      }
+      // Handle GPS coordinates
+      else if (p[1] === 'gps') {
+        if (p[2] === 'latitude' || p[2] === 'longitude') {
+          onGPSUpdate(1, p[2], payload);
+        }
+      } else if (p[1] === 'gps2') {
+        if (p[2] === 'latitude' || p[2] === 'longitude') {
+          onGPSUpdate(2, p[2], payload);
+        }
+      }
     }
   };
   doConnect();
@@ -1934,7 +2197,17 @@ function doConnect(){
       for(let i=1;i<=4;i++){
         mqttClient.subscribe(`esp32/bin${i}/distance`);
         mqttClient.subscribe(`esp32/bin${i}/status`);
+        mqttClient.subscribe(`esp32/ir${i}/status`);
       }
+      // Subscribe to servo control to sync lid state
+      mqttClient.subscribe(`esp32/servo/control`);
+      mqttClient.subscribe(`esp32/servo/control_2`);
+      
+      // Subscribe to GPS coordinate topics
+      mqttClient.subscribe(`esp32/gps/latitude`);
+      mqttClient.subscribe(`esp32/gps/longitude`);
+      mqttClient.subscribe(`esp32/gps2/latitude`);
+      mqttClient.subscribe(`esp32/gps2/longitude`);
     },
     onFailure:()=>{
       setMqttState("Lỗi kết nối · Thử lại...",'off');
@@ -1951,7 +2224,21 @@ function sendMsg(topic,val){
   } else { showToast("Chưa kết nối","MQTT chưa sẵn sàng",'danger'); }
 }
 
-function openBin(id)          { sendMsg("esp32/servo/control",id); }
+function openBin(id) { 
+  if (id === 0) {
+    sendMsg("esp32/servo/control", "0");
+    triggerLidTimer(1);
+  } else if (id === 1) {
+    sendMsg("esp32/servo/control", "1");
+    triggerLidTimer(2);
+  } else if (id === 2) {
+    sendMsg("esp32/servo/control_2", "0");
+    triggerLidTimer(3);
+  } else if (id === 3) {
+    sendMsg("esp32/servo/control_2", "1");
+    triggerLidTimer(4);
+  }
+}
 function sendAudioCommand(v)  { sendMsg("esp32/audio/control",v); }
 
 function openBinBtn(btn, id){
@@ -1963,20 +2250,35 @@ function openBinBtn(btn, id){
   setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('sent'); },2200);
 }
 
+/* Lid timer logic */
+function triggerLidTimer(id) {
+  lidOpen[id] = true;
+  if (lidTimeout[id]) {
+    clearTimeout(lidTimeout[id]);
+  }
+  updateBinUI(id);
+  
+  lidTimeout[id] = setTimeout(() => {
+    lidOpen[id] = false;
+    lidTimeout[id] = null;
+    updateBinUI(id);
+  }, 8600); // 8.6s total time (open + hold + close transitions)
+}
+
 /* ══════════ OFFLINE ══════════ */
 function startOfflineTimer(id){
   if(lastSeen[id]) clearTimeout(lastSeen[id]);
   if(offlineFlag[id]){
     offlineFlag[id]=false;
     document.getElementById(`offline-${id}`).classList.remove('show');
-    document.getElementById(`card-${id}`).classList.remove('offline');
     showToast(`Thùng ${id} đã khôi phục`,"Kết nối trở lại bình thường",'success');
+    updateBinUI(id);
   }
   lastSeen[id] = setTimeout(()=>{
     offlineFlag[id]=true;
     document.getElementById(`offline-${id}`).classList.add('show');
-    document.getElementById(`card-${id}`).classList.add('offline');
     showToast(`Thùng ${id} mất kết nối`,"Vui lòng kiểm tra thiết bị",'danger');
+    updateBinUI(id);
     updateStats();
   },OFFLINE_MS);
 }
@@ -2080,10 +2382,7 @@ function onDistance(id, dist){
   });
 
   /* card state */
-  const card = document.getElementById(`card-${id}`);
-  card.classList.remove('warn','danger');
-  if(isDanger) card.classList.add('danger');
-  else if(isWarn) card.classList.add('warn');
+  updateBinUI(id);
 
   /* toast throttle */
   const key = `${id}-${isDanger?'d':isWarn?'w':'s'}`;
@@ -2099,18 +2398,150 @@ function onDistance(id, dist){
 
 /* ══════════ STATUS ══════════ */
 function onStatus(id, raw){
+  binStatus[id] = raw;
+  updateBinUI(id);
+}
+
+function onIRStatus(id, raw){
+  irStatus[id] = raw;
+  updateBinUI(id);
+}
+
+/* Unified UI update logic for each Bin */
+function updateBinUI(id) {
   const el = document.getElementById(`status-${id}`);
-  if(!el) return;
-  const s = raw.toUpperCase().trim();
-  if(s==='FULL'){
-    el.className='status-chip chip-full';
-    el.innerHTML=`<span class="chip-dot"></span>Đầy · FULL`;
-  } else if(s==='EMPTY'){
-    el.className='status-chip chip-ok';
-    el.innerHTML=`<span class="chip-dot"></span>Trống · EMPTY`;
+  const card = document.getElementById(`card-${id}`);
+  if (!el || !card) return;
+  
+  // Clean classes
+  card.classList.remove('warn', 'danger', 'stuck', 'offline');
+  
+  if (offlineFlag[id]) {
+    card.classList.add('offline');
+    el.className = 'status-chip chip-load';
+    el.innerHTML = `<span class="chip-dot"></span>Ngoại tuyến`;
+    return;
+  }
+  
+  // Jammed warning logic
+  if (!lidOpen[id] && irStatus[id] === "DETECTED") {
+    card.classList.add('stuck');
+    el.className = 'status-chip chip-stuck';
+    el.innerHTML = `<span class="chip-dot"></span>Kẹt nắp · JAMMED`;
+    
+    // Toast warning throttled (30s)
+    const toastKey = `${id}-stuck`;
+    if (!TOAST_THR[toastKey]) {
+      TOAST_THR[toastKey] = true;
+      setTimeout(() => delete TOAST_THR[toastKey], 30000);
+      showToast(`⚠️ Thùng ${id} bị kẹt nắp!`, `Cảm biến IR phát hiện vật cản khi nắp đóng.`, 'warn');
+    }
+    return;
+  }
+  
+  // Normal state logic
+  const fill = fillData[id] || 0;
+  const isDanger = fill >= DANGER_PCT;
+  const isWarn = !isDanger && fill >= WARN_PCT;
+  
+  if (isDanger) card.classList.add('danger');
+  else if (isWarn) card.classList.add('warn');
+  
+  const s = (binStatus[id] || "Đang tải...").toUpperCase().trim();
+  if (s === 'FULL') {
+    el.className = 'status-chip chip-full';
+    el.innerHTML = `<span class="chip-dot"></span>Đầy · FULL`;
+  } else if (s === 'EMPTY') {
+    el.className = 'status-chip chip-ok';
+    el.innerHTML = `<span class="chip-dot"></span>Trống · EMPTY`;
   } else {
-    el.className='status-chip chip-load';
-    el.innerHTML=`<span class="chip-dot"></span>${raw}`;
+    el.className = 'status-chip chip-load';
+    el.innerHTML = `<span class="chip-dot"></span>${binStatus[id]}`;
+  }
+}
+
+/* ══════════ MAP INITIALIZATION & UPDATE ══════════ */
+function initMap() {
+  try {
+    // Center map to IUH area
+    map = L.map('map').setView([10.82223, 106.6876], 18);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Dynamic marker CSS style divIcons
+    const greenIcon = L.divIcon({
+      className: 'custom-gps-icon-1',
+      html: `<div style="background-color: var(--c-green2); width: 14px; height: 14px; border: 2.5px solid #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(16,185,129,0.7); animation: ping-dot 2s ease infinite;"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
+    const blueIcon = L.divIcon({
+      className: 'custom-gps-icon-2',
+      html: `<div style="background-color: var(--c-blue2); width: 14px; height: 14px; border: 2.5px solid #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(37,99,235,0.7); animation: ping-dot 2s ease infinite;"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
+    marker1 = L.marker(defaultGPS1, { icon: greenIcon }).addTo(map)
+      .bindPopup('<b>ESP1</b><br>Thùng 1 & 2<br>Tọa độ mặc định');
+
+    marker2 = L.marker(defaultGPS2, { icon: blueIcon }).addTo(map)
+      .bindPopup('<b>ESP2</b><br>Thùng 3 & 4<br>Tọa độ mặc định');
+      
+    document.getElementById('map-status').textContent = 'Đã tải bản đồ';
+  } catch (err) {
+    console.error('Lỗi khởi tạo bản đồ:', err);
+    document.getElementById('map-status').textContent = 'Lỗi tải bản đồ';
+  }
+}
+
+function onGPSUpdate(espId, type, rawValue) {
+  const statusEl = document.getElementById(`gps-status-${espId}`);
+  if (rawValue === 'NO_FIX' || rawValue === '0.000000') {
+    if (statusEl) statusEl.textContent = 'Mất tín hiệu GPS (Chưa bắt được vệ tinh)';
+    return;
+  }
+  const value = parseFloat(rawValue);
+  if (isNaN(value) || value === 0) return;
+  
+  if (type === 'latitude') {
+    currentGPS[espId].lat = value;
+  } else if (type === 'longitude') {
+    currentGPS[espId].lng = value;
+  }
+  
+  currentGPS[espId].hasFix = true;
+  
+  // Update UI panel
+  const latEl = document.getElementById(`gps-lat-${espId}`);
+  const lngEl = document.getElementById(`gps-lng-${espId}`);
+  
+  if (latEl) latEl.textContent = currentGPS[espId].lat.toFixed(6);
+  if (lngEl) lngEl.textContent = currentGPS[espId].lng.toFixed(6);
+  if (statusEl) statusEl.textContent = 'Dữ liệu GPS Live';
+  
+  // Update marker position
+  const pos = [currentGPS[espId].lat, currentGPS[espId].lng];
+  const marker = espId === 1 ? marker1 : marker2;
+  
+  if (marker && map) {
+    marker.setLatLng(pos);
+    marker.setPopupContent(`<b>ESP${espId}</b><br>Thùng ${espId === 1 ? '1 & 2' : '3 & 4'}<br>GPS Live`);
+    
+    // Auto center map or zoom to fit bounds
+    if (currentGPS[1].hasFix && currentGPS[2].hasFix) {
+      const bounds = L.latLngBounds([
+        [currentGPS[1].lat, currentGPS[1].lng],
+        [currentGPS[2].lat, currentGPS[2].lng]
+      ]);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+      map.setView(pos, 18);
+    }
   }
 }
 
@@ -2120,7 +2551,7 @@ function startAllOfflineWatchers(){
     lastSeen[id] = setTimeout(()=>{
       offlineFlag[id]=true;
       document.getElementById(`offline-${id}`).classList.add('show');
-      document.getElementById(`card-${id}`).classList.add('offline');
+      updateBinUI(id);
       updateStats();
       updateAdminStats();
     }, OFFLINE_MS);
