@@ -10,6 +10,9 @@
 <!-- Leaflet CSS & JS for OpenStreetMap -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <style>
 /* ══════════════ RESET & ROOT ══════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -998,7 +1001,7 @@ footer{
 }
 
 .admin-toggle-btn{
-  position:fixed;top:16px;right:24px;z-index:98;
+  position:fixed;top:76px;right:24px;z-index:101;
   width:40px;height:40px;border-radius:50%;
   background:linear-gradient(135deg,#059669,#10b981);
   border:none;cursor:pointer;
@@ -1276,6 +1279,171 @@ footer{
   color: var(--c-text4);
   font-style: italic;
   text-align: right;
+}
+
+/* ══════════════ INCIDENT LOG PANEL ══════════════ */
+.log-panel {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-2xl);
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 4px 20px rgba(15,23,42,0.04);
+  position: relative;
+  overflow: hidden;
+  animation: slide-up 0.55s var(--ease-out) both;
+}
+.log-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 0% 100%, rgba(249,115,22,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.log-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.log-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-text2);
+  letter-spacing: -0.2px;
+}
+.log-badge {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+  border: 1px solid rgba(217,119,6,0.18);
+  padding: 2px 9px;
+  border-radius: 99px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.log-count {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--c-text4);
+}
+
+.log-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+}
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.log-table thead {
+  background: var(--c-surface2);
+}
+.log-table th {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--c-text4);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--c-border);
+  white-space: nowrap;
+}
+.log-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text2);
+  vertical-align: middle;
+}
+.log-table tbody tr {
+  transition: background 0.15s;
+}
+.log-table tbody tr:hover {
+  background: var(--c-surface2);
+}
+.log-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.log-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.log-type-badge.jammed {
+  background: #fff7ed;
+  border: 1px solid rgba(249,115,22,0.25);
+  color: #c2410c;
+}
+.log-type-badge.offline {
+  background: var(--c-red-bg);
+  border: 1px solid rgba(220,38,38,0.2);
+  color: var(--c-red-txt);
+}
+.log-type-badge.online {
+  background: var(--c-green-bg);
+  border: 1px solid rgba(5,150,105,0.2);
+  color: var(--c-green-txt);
+}
+.log-type-badge.resolved {
+  background: var(--c-blue-bg);
+  border: 1px solid rgba(37,99,235,0.18);
+  color: var(--c-blue-txt);
+}
+
+.log-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--c-text4);
+  font-size: 12.5px;
+}
+.log-empty-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.log-clear-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(220,38,38,0.2);
+  background: var(--c-red-bg);
+  color: #b91c1c;
+  font-family: var(--f-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.log-clear-btn:hover {
+  background: #fee2e2;
+  border-color: rgba(220,38,38,0.35);
+  transform: translateY(-1px);
+}
+.log-clear-btn:active {
+  transform: scale(0.96);
+}
+.log-clear-btn svg {
+  width: 12px;
+  height: 12px;
 }
 </style>
 </head>
@@ -1792,6 +1960,46 @@ footer{
       </div>
     </div>
   </div>
+
+  <!-- INCIDENT LOG PANEL -->
+  <div class="log-panel reveal" style="margin-top:24px">
+    <div class="log-header">
+      <div class="log-header-left">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px;color:var(--c-amber)">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <span class="log-title">Lịch sử sự cố</span>
+        <span class="log-badge">Firebase Live</span>
+        <span class="log-count" id="log-count">0 sự kiện</span>
+      </div>
+      <button class="log-clear-btn admin-only" id="log-clear-btn" onclick="clearFirebaseLogs()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14H6L5 6"/>
+          <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+        </svg>
+        Xóa lịch sử
+      </button>
+    </div>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Thùng</th>
+            <th>Loại sự cố</th>
+            <th>Mô tả</th>
+          </tr>
+        </thead>
+        <tbody id="log-table-body">
+          <tr><td colspan="4" class="log-empty"><div class="log-empty-icon">📋</div>Chưa có dữ liệu sự cố</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </main>
 
 <footer>
@@ -1903,6 +2111,10 @@ const lidOpen    = {1:false, 2:false, 3:false, 4:false};
 const lidTimeout = {1:null, 2:null, 3:null, 4:null};
 const binStatus  = {1:"Đang tải...", 2:"Đang tải...", 3:"Đang tải...", 4:"Đang tải..."};
 
+/* Firebase logging transition flags */
+const isStuckLogged   = {1:false, 2:false, 3:false, 4:false};
+const isOfflineLogged = {1:false, 2:false, 3:false, 4:false};
+
 let map = null;
 let marker1 = null;
 let marker2 = null;
@@ -1914,6 +2126,95 @@ const currentGPS = {
   1: { lat: defaultGPS1[0], lng: defaultGPS1[1], hasFix: false },
   2: { lat: defaultGPS2[0], lng: defaultGPS2[1], hasFix: false }
 };
+
+/* ══════════ FIREBASE INIT ══════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDzQFoQ8R023siAj2qaKVneQHu_BII1Zlc",
+  authDomain: "tuiot-ad770.firebaseapp.com",
+  databaseURL: "https://tuiot-ad770-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "tuiot-ad770",
+  storageBucket: "tuiot-ad770.firebasestorage.app",
+  messagingSenderId: "174269480706",
+  appId: "1:174269480706:web:96cbe14c0680f9f7c34c1b",
+  measurementId: "G-S1XNWLX6EY"
+};
+
+let firebaseDB = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  firebaseDB = firebase.database();
+  console.log('Firebase Realtime Database đã kết nối.');
+} catch(e) {
+  console.error('Lỗi khởi tạo Firebase:', e);
+}
+
+function writeFirebaseLog(binId, eventType, description) {
+  if (!firebaseDB) return;
+  const logRef = firebaseDB.ref('logs').push();
+  logRef.set({
+    binId: binId,
+    eventType: eventType,
+    description: description,
+    timestamp: Date.now(),
+    timeString: new Date().toLocaleString('vi-VN', {
+      hour:'2-digit', minute:'2-digit', second:'2-digit',
+      day:'2-digit', month:'2-digit', year:'numeric',
+      hour12: false
+    })
+  }).catch(err => console.error('Firebase write error:', err));
+}
+
+function listenFirebaseLogs() {
+  if (!firebaseDB) return;
+  firebaseDB.ref('logs').orderByChild('timestamp').limitToLast(20).on('value', snapshot => {
+    const tbody = document.getElementById('log-table-body');
+    const countEl = document.getElementById('log-count');
+    if (!tbody) return;
+    
+    const logs = [];
+    snapshot.forEach(child => {
+      logs.push({ key: child.key, ...child.val() });
+    });
+    
+    // Sort newest first
+    logs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    
+    if (countEl) countEl.textContent = `${logs.length} sự kiện`;
+    
+    if (logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="log-empty"><div class="log-empty-icon">📋</div>Chưa có dữ liệu sự cố</td></tr>';
+      return;
+    }
+    
+    const typeLabels = {
+      'JAMMED':          { text: 'Kẹt nắp',       cls: 'jammed'   },
+      'JAMMED_RESOLVED': { text: 'Hết kẹt',        cls: 'resolved' },
+      'OFFLINE':         { text: 'Mất kết nối',    cls: 'offline'  },
+      'ONLINE':          { text: 'Khôi phục',      cls: 'online'   }
+    };
+    
+    tbody.innerHTML = logs.map(log => {
+      const info = typeLabels[log.eventType] || { text: log.eventType, cls: '' };
+      return `<tr>
+        <td style="font-family:var(--f-mono);font-size:11px;white-space:nowrap">${log.timeString || '--'}</td>
+        <td><strong>Thùng ${log.binId}</strong></td>
+        <td><span class="log-type-badge ${info.cls}">${info.text}</span></td>
+        <td style="font-size:11.5px;color:var(--c-text3)">${log.description || ''}</td>
+      </tr>`;
+    }).join('');
+  });
+}
+
+function clearFirebaseLogs() {
+  if (!firebaseDB) return;
+  if (!confirm('Xóa toàn bộ lịch sử sự cố?')) return;
+  firebaseDB.ref('logs').remove()
+    .then(() => showToast('Đã xóa lịch sử', 'Toàn bộ log sự cố đã được xóa.', 'success'))
+    .catch(err => {
+      console.error('Firebase delete error:', err);
+      showToast('Lỗi xóa dữ liệu', err.message, 'danger');
+    });
+}
 
 /* ══════════ USER ROLE MANAGEMENT ══════════ */
 let currentUserRole = localStorage.getItem('userRole') || 'user';
@@ -2272,12 +2573,22 @@ function startOfflineTimer(id){
     offlineFlag[id]=false;
     document.getElementById(`offline-${id}`).classList.remove('show');
     showToast(`Thùng ${id} đã khôi phục`,"Kết nối trở lại bình thường",'success');
+    /* Firebase: log ONLINE transition */
+    if (isOfflineLogged[id]) {
+      isOfflineLogged[id] = false;
+      writeFirebaseLog(id, 'ONLINE', `Thùng ${id} đã khôi phục kết nối.`);
+    }
     updateBinUI(id);
   }
   lastSeen[id] = setTimeout(()=>{
     offlineFlag[id]=true;
     document.getElementById(`offline-${id}`).classList.add('show');
     showToast(`Thùng ${id} mất kết nối`,"Vui lòng kiểm tra thiết bị",'danger');
+    /* Firebase: log OFFLINE transition */
+    if (!isOfflineLogged[id]) {
+      isOfflineLogged[id] = true;
+      writeFirebaseLog(id, 'OFFLINE', `Thùng ${id} mất kết nối (không nhận dữ liệu > ${OFFLINE_MS/1000}s).`);
+    }
     updateBinUI(id);
     updateStats();
   },OFFLINE_MS);
@@ -2429,6 +2740,12 @@ function updateBinUI(id) {
     el.className = 'status-chip chip-stuck';
     el.innerHTML = `<span class="chip-dot"></span>Kẹt nắp · JAMMED`;
     
+    /* Firebase: log JAMMED transition (only on first detection) */
+    if (!isStuckLogged[id]) {
+      isStuckLogged[id] = true;
+      writeFirebaseLog(id, 'JAMMED', `Thùng ${id} bị kẹt nắp – cảm biến IR phát hiện vật cản khi nắp đóng.`);
+    }
+    
     // Toast warning throttled (30s)
     const toastKey = `${id}-stuck`;
     if (!TOAST_THR[toastKey]) {
@@ -2437,6 +2754,12 @@ function updateBinUI(id) {
       showToast(`⚠️ Thùng ${id} bị kẹt nắp!`, `Cảm biến IR phát hiện vật cản khi nắp đóng.`, 'warn');
     }
     return;
+  }
+  
+  /* Firebase: log JAMMED_RESOLVED if previously stuck */
+  if (isStuckLogged[id]) {
+    isStuckLogged[id] = false;
+    writeFirebaseLog(id, 'JAMMED_RESOLVED', `Thùng ${id} đã hết kẹt nắp – hoạt động bình thường.`);
   }
   
   // Normal state logic
@@ -2551,11 +2874,19 @@ function startAllOfflineWatchers(){
     lastSeen[id] = setTimeout(()=>{
       offlineFlag[id]=true;
       document.getElementById(`offline-${id}`).classList.add('show');
+      /* Firebase: log initial OFFLINE */
+      if (!isOfflineLogged[id]) {
+        isOfflineLogged[id] = true;
+        writeFirebaseLog(id, 'OFFLINE', `Thùng ${id} mất kết nối (không nhận dữ liệu > ${OFFLINE_MS/1000}s).`);
+      }
       updateBinUI(id);
       updateStats();
       updateAdminStats();
     }, OFFLINE_MS);
   });
+  
+  /* Start listening to Firebase logs */
+  listenFirebaseLogs();
 }
 </script>
 </body>
